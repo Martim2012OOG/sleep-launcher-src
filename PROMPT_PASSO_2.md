@@ -1,0 +1,4 @@
+Continua o projeto "Kubo Launcher" (zip anexo). Lê primeiro README.md e PASSO_ATUAL.md.
+É um launcher Minecraft original em Tauri 2 (Rust) + HTML/CSS/JS sem build, para Windows, Mac e Linux, leve e rápido a compilar. O tema é igual ao do meu client Kubo: variáveis CSS em src/index.html (accent #7FB3F5, fundo #0E0F13, cartões #15161B, botões #323849, Jogar verde #1B5A2A/#9BF0AE) e 8 presets. Mantém esse visual.
+Faz o PASSO 2: instalações reais. Comandos Rust em src-tauri/src (módulos separados): ler o version_manifest da Mojang, listar versões (incluindo 1.20.1, 26.2, 26.3), criar instalação, descarregar cliente, bibliotecas e assets, e iniciar o jogo. A página Instalações e o botão Jogar chamam esses comandos com invoke. Mostra progresso do download.
+No fim: explica o que fizeste, dá o zip completo, o preview da interface, e o prompt para o passo 3 (injetar o mod Kubo por versão + manifesto remoto). Atualiza PASSO_ATUAL.md.

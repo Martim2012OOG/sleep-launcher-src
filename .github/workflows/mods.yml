@@ -1,0 +1,25 @@
+name: Publish mods manifest
+
+# Corre sozinho quando o CI do client termina (ou à mão). Gera o mods.json com os SHA-1 e publica-o, com os jars,
+# na release fixa "mods". Todos os launchers leem esse ficheiro quando carregas em Jogar.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mods:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gerar mods.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 tools/make_mods_manifest.py "${{ github.repository }}" mods
+      - name: Publicar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view mods >/dev/null 2>&1 || gh release create mods --title "Mods" --notes "Ficheiros que o launcher descarrega sozinho. Não apagar." --prerelease
+          gh release upload mods dist-mods/* --clobber

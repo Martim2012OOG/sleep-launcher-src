@@ -1,0 +1,52 @@
+{
+  "productName": "Sleep Launcher",
+  "version": "0.1.0",
+  "identifier": "app.kubo.launcher",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Sleep Launcher",
+        "width": 1100,
+        "height": 680,
+        "minWidth": 860,
+        "minHeight": 540,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "theme": "Dark",
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/**",
+          "$APPLOCALDATA/**"
+        ]
+      }
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA4NkIwRUM2MUQ2NTlBMUYKUldRZm1tVWR4ZzVyQ05UMDdZaWx5NFB2RFNZbjVtY0VMM2RkTFNTa3RJWGoxTUNzWEhmOWpRMm4K",
+      "endpoints": []
+    }
+  }
+}

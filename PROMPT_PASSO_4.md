@@ -1,0 +1,4 @@
+Continua o projeto "Kubo Launcher" (zip anexo). Lê primeiro README.md e PASSO_ATUAL.md.
+É um launcher Minecraft original em Tauri 2 (Rust) + HTML/CSS/JS sem build, para Windows, Mac e Linux, leve e rápido a compilar. O tema é igual ao do meu client Kubo (variáveis CSS em src/index.html). Mantém o visual. Os passos 2 e 3 foram escritos sem compilar: se algo não compilar, corrige primeiro.
+Faz o PASSO 4: (a) abrir com o computador (plugin tauri-plugin-autostart, ligado e desligado pelo interruptor "Abrir com o computador" em Definições, que hoje é só visual); (b) ícone na bandeja do sistema com menu (Abrir, Jogar última instalação, Sair) e fechar a janela deve minimizar para a bandeja; (c) guardar a última instalação jogada e as definições (nome, tema escolhido) em settings.json em vez de localStorage.
+No fim: explica o que fizeste, dá o zip completo, o preview da interface, e o prompt para o passo 5 (login Microsoft, skins e capas). Atualiza PASSO_ATUAL.md.
