@@ -4,7 +4,8 @@
    Textos com números (ex.: "Faltam 50") usam as regras de PADRÕES mais abaixo. Para um idioma novo: nova coluna + entrada em LANGS. */
 (function(){
 const LANGS=[["en","English","🇬🇧"],["pt","Português (Portugal)","🇵🇹"],["es","Español","🇪🇸"]];
-const TABLE=`Escolhe a capa da tua conta Minecraft. Aparece no jogo e no boneco ao lado.|Pick your Minecraft account cape. It shows in game and on the character beside it.|Elige la capa de tu cuenta de Minecraft. Aparece en el juego y en el muñeco de al lado.
+const TABLE=`Não foi possível abrir a janela de entrada. Tenta outra vez.|Could not open the sign-in window. Try again.|No se pudo abrir la ventana de inicio de sesión. Inténtalo de nuevo.
+Escolhe a capa da tua conta Minecraft. Aparece no jogo e no boneco ao lado.|Pick your Minecraft account cape. It shows in game and on the character beside it.|Elige la capa de tu cuenta de Minecraft. Aparece en el juego y en el muñeco de al lado.
 Esta conta não tem capas da Mojang.|This account has no Mojang capes.|Esta cuenta no tiene capas de Mojang.
 Could not start Horizon. Try again.|Could not start Horizon. Try again.|No se pudo iniciar Horizon. Inténtalo de nuevo.
 A abrir a janela de entrada da Microsoft…|Opening the Microsoft sign-in window…|Abriendo la ventana de inicio de sesión de Microsoft…

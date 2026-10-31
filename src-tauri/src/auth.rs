@@ -377,10 +377,15 @@ pub async fn login_web(app: &AppHandle) -> Result<Value, String> {
     .map_err(e)?;
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let tx2 = tx.clone();
-    if let Some(old) = app.get_webview_window("login") {
-        let _ = old.close();
+    // cada tentativa usa um nome novo (no Windows fechar a janela antiga demora e o nome ficava ocupado)
+    static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    for (l, w) in app.webview_windows() {
+        if l.starts_with("login") {
+            let _ = w.destroy();
+        }
     }
-    let win = WebviewWindowBuilder::new(app, "login", WebviewUrl::External(url))
+    let label = format!("login{}", N.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+    let win = WebviewWindowBuilder::new(app, label.as_str(), WebviewUrl::External(url))
         .title("Sign in with Microsoft")
         .inner_size(480.0, 660.0)
         .center()
@@ -394,7 +399,7 @@ pub async fn login_web(app: &AppHandle) -> Result<Value, String> {
             }
         })
         .build()
-        .map_err(e)?;
+        .map_err(|_| "Não foi possível abrir a janela de entrada. Tenta outra vez.".to_string())?;
     win.on_window_event(move |ev| {
         if let WindowEvent::Destroyed = ev {
             let _ = tx2.send(String::new());
