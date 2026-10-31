@@ -1,6 +1,6 @@
 {
   "productName": "Sleep Launcher",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "identifier": "app.kubo.launcher",
   "build": {
     "frontendDist": "../src"
@@ -41,7 +41,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": false
+    }
   },
   "plugins": {
     "updater": {
