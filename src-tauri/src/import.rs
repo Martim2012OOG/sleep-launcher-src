@@ -61,7 +61,73 @@ fn read_json(p: &Path) -> Option<Value> {
     std::fs::read(p).ok().and_then(|b| serde_json::from_slice(&b).ok())
 }
 
+/// "1.21.11" dentro de um texto (só versões 1.x): junto de + - _ ou espaço, ou a abrir.
+fn mc_ver_in(s: &str) -> Option<String> {
+    let b = s.as_bytes();
+    let mut i = 0;
+    while i + 3 < b.len() {
+        if b[i] == b'1' && b[i + 1] == b'.' && (i == 0 || matches!(b[i - 1], b'+' | b'-' | b'_' | b' ' | b'(' | b'[' | b'/')) {
+            let mut j = i + 2;
+            let st = j;
+            while j < b.len() && b[j].is_ascii_digit() {
+                j += 1;
+            }
+            if j > st && j - st <= 2 {
+                let mut end = j;
+                if j < b.len() && b[j] == b'.' {
+                    let mut k = j + 1;
+                    let s2 = k;
+                    while k < b.len() && b[k].is_ascii_digit() {
+                        k += 1;
+                    }
+                    if k > s2 && k - s2 <= 2 {
+                        end = k;
+                    }
+                }
+                return Some(s[i..end].to_string());
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Quando o launcher de origem não diz a versão: tenta o nome da pasta e depois os nomes dos mods (o mais comum ganha).
+fn guess_version(game: &Path) -> (String, String) {
+    let mut ver = String::new();
+    for p in [game, game.parent().unwrap_or(game)] {
+        if let Some(v) = mc_ver_in(&fname(p)) {
+            ver = v;
+            break;
+        }
+    }
+    let (mut votes, mut fab, mut neo, mut frg, mut qlt) = (std::collections::HashMap::<String, u32>::new(), 0, 0, 0, 0);
+    if let Ok(rd) = std::fs::read_dir(game.join("mods")) {
+        for en in rd.flatten() {
+            let n = en.file_name().to_string_lossy().to_lowercase();
+            if !(n.ends_with(".jar") || n.ends_with(".jar.disabled")) {
+                continue;
+            }
+            if let Some(v) = mc_ver_in(&n) {
+                *votes.entry(v).or_insert(0) += 1;
+            }
+            if n.contains("fabric") { fab += 1 }
+            if n.contains("neoforge") { neo += 1 } else if n.contains("forge") { frg += 1 }
+            if n.contains("quilt") { qlt += 1 }
+        }
+    }
+    if ver.is_empty() {
+        if let Some((v, _)) = votes.into_iter().max_by_key(|(_, c)| *c) {
+            ver = v;
+        }
+    }
+    let ld = if neo > 0 && neo >= fab { "neoforge" } else if frg > 0 && frg >= fab { "forge" } else if qlt > 0 && qlt > fab { "quilt" } else if fab > 0 { "fabric" } else { "" };
+    (ver, ld.to_string())
+}
+
 fn found(source: &str, name: &str, game: &Path, version: &str, loader: &str) -> Value {
+    let (gv, gl) = if version.is_empty() { guess_version(game) } else { (String::new(), String::new()) };
+    let (version, loader) = if version.is_empty() { (gv.as_str(), if loader.is_empty() { gl.as_str() } else { loader }) } else { (version, loader) };
     // a pasta que se pode mandar para o Lixo é a da instância (nos Prism / MultiMC o jogo fica numa subpasta "minecraft")
     let root = if matches!(fname(game).as_str(), "minecraft" | ".minecraft") && game.parent().map(|p| p.join("instance.cfg").exists() || p.join("mmc-pack.json").exists()).unwrap_or(false) { game.parent().unwrap_or(game) } else { game };
     json!({

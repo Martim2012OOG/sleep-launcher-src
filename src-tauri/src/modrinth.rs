@@ -176,6 +176,55 @@ pub async fn install(game: &Path, kind: &str, project: &str, mc: &str, loader: &
     Ok(done)
 }
 
+/// Lê o fabric.mod.json / quilt.mod.json / mods.toml de dentro do jar: nome, autor e ícone (como imagem embutida).
+fn jar_meta(p: &Path) -> (Option<String>, Option<String>, Option<String>) {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    use std::io::Read;
+    let Ok(f) = std::fs::File::open(p) else { return (None, None, None) };
+    let Ok(mut z) = zip::ZipArchive::new(f) else { return (None, None, None) };
+    let mut txt = String::new();
+    let mut kind = "";
+    for (n, k) in [("fabric.mod.json", "json"), ("quilt.mod.json", "quilt"), ("META-INF/neoforge.mods.toml", "toml"), ("META-INF/mods.toml", "toml")] {
+        if let Ok(mut e) = z.by_name(n) {
+            if e.size() < 400_000 && e.read_to_string(&mut txt).is_ok() {
+                kind = k;
+                break;
+            }
+        }
+    }
+    let (mut name, mut author, mut icon_path) = (None::<String>, None::<String>, None::<String>);
+    if kind == "json" || kind == "quilt" {
+        if let Ok(v) = serde_json::from_str::<Value>(&txt) {
+            let q = if kind == "quilt" { &v["quilt_loader"]["metadata"] } else { &v };
+            name = q["name"].as_str().map(String::from);
+            let au = &q[if kind == "quilt" { "contributors" } else { "authors" }];
+            author = if let Some(a) = au.as_array() {
+                a.iter().filter_map(|x| x.as_str().or(x["name"].as_str())).next().map(String::from)
+            } else {
+                au.as_object().and_then(|o| o.keys().next().cloned())
+            };
+            icon_path = q["icon"].as_str().map(String::from).or_else(|| q["icon"].as_object().and_then(|o| o.values().filter_map(|x| x.as_str()).last().map(String::from)));
+        }
+    } else if kind == "toml" {
+        let g = |key: &str| txt.lines().find(|l| l.trim_start().starts_with(key)).and_then(|l| l.split_once('=')).map(|(_, v)| v.trim().trim_matches('"').trim_matches('\'').to_string());
+        name = g("displayName");
+        author = g("authors");
+        icon_path = g("logoFile");
+    }
+    let mut icon = None;
+    if let Some(ip) = icon_path {
+        if let Ok(mut e) = z.by_name(ip.trim_start_matches('/')) {
+            if e.size() < 300_000 {
+                let mut b = Vec::new();
+                if e.read_to_end(&mut b).is_ok() {
+                    icon = Some(format!("data:image/png;base64,{}", STANDARD.encode(b)));
+                }
+            }
+        }
+    }
+    (name, author, icon)
+}
+
 pub fn list(game: &Path, kind: &str) -> Result<Vec<Value>, String> {
     let fo = folder(kind)?;
     let idx = idx_read(game);
@@ -198,7 +247,20 @@ pub fn list(game: &Path, kind: &str) -> Result<Vec<Value>, String> {
                     }
                 }
             }
-            out.push(json!({ "file": name, "enabled": enabled, "title": title, "icon": icon, "project": project }));
+            let mut author = Value::Null;
+            if project.is_null() && base.ends_with(".jar") {
+                let (n, a, ic) = jar_meta(&game.join(fo).join(&name));
+                if let Some(n) = n.filter(|x| !x.trim().is_empty()) {
+                    title = n;
+                }
+                if let Some(a) = a {
+                    author = json!(a);
+                }
+                if let Some(ic) = ic {
+                    icon = json!(ic);
+                }
+            }
+            out.push(json!({ "file": name, "enabled": enabled, "title": title, "icon": icon, "project": project, "author": author }));
         }
     }
     out.sort_by_key(|x| x["title"].as_str().unwrap_or("").to_lowercase());
