@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>O Sleep precisa do microfone para o chat de voz (Simple Voice Chat, Plasmo Voice) e para gravar clips com a tua voz.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>O Sleep usa o reconhecimento de fala para guardar clips quando dizes a tua frase (por exemplo "Jarvis, clipa isto").</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Alguns mods de voz e vídeo podem pedir a câmara.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>O Sleep controla a app de música para mostrar e mudar a música que está a tocar.</string>
+</dict>
+</plist>

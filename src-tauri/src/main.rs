@@ -283,6 +283,49 @@ async fn version_panorama(app: AppHandle, version: String, url: String) -> Resul
     Ok(format!("data:image/png;base64,{}", STANDARD.encode(bytes)))
 }
 
+// ---------- ícone da app personalizável (como o Discord) ----------
+
+#[cfg(target_os = "macos")]
+mod dock {
+    use objc::{class, msg_send, runtime::Object, sel, sel_impl};
+    #[link(name = "AppKit", kind = "framework")]
+    extern "C" {}
+    /// Troca o ícone do Dock (tem de correr na thread principal).
+    pub fn set(bytes: &[u8]) {
+        unsafe {
+            let data: *mut Object = msg_send![class!(NSData), dataWithBytes: bytes.as_ptr() as *const std::ffi::c_void length: bytes.len()];
+            let img: *mut Object = msg_send![class!(NSImage), alloc];
+            let img: *mut Object = msg_send![img, initWithData: data];
+            if img.is_null() {
+                return;
+            }
+            let app: *mut Object = msg_send![class!(NSApplication), sharedApplication];
+            let _: () = msg_send![app, setApplicationIconImage: img];
+        }
+    }
+}
+
+/// Muda o ícone da app (Dock no Mac, janela e barra de tarefas no Windows/Linux). `b64` é um PNG.
+#[tauri::command]
+fn set_app_icon(app: AppHandle, b64: String) -> Result<(), String> {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    let bytes = STANDARD.decode(b64.trim()).map_err(|x| x.to_string())?;
+    if bytes.len() > 6_000_000 || bytes.len() < 100 {
+        return Err("imagem inválida".into());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let b = bytes.clone();
+        let _ = app.run_on_main_thread(move || dock::set(&b));
+    }
+    if let Some(w) = app.get_webview_window("main") {
+        if let Ok(img) = tauri::image::Image::from_bytes(&bytes) {
+            let _ = w.set_icon(img);
+        }
+    }
+    Ok(())
+}
+
 // ---------- atualização do próprio launcher (GitHub Releases, assinada) ----------
 
 fn updater(app: &AppHandle) -> Result<tauri_plugin_updater::Updater, String> {
@@ -946,6 +989,7 @@ fn main() {
             import::import_copy,
             import::trash_leftovers,
             instance_game_dir,
+            set_app_icon,
             app_check_update,
             app_install_update,
             media_list,

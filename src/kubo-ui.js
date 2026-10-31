@@ -294,11 +294,23 @@ vDet=function(d){let h=_vDet(d);const ic=icoHTML(d.name,62);if(ic)h=h.replace(/<
 document.addEventListener("click",e=>{const el=e.target.closest(".icard[data-a=open]");if(!el)return;e.stopPropagation();S.cur=el.dataset.n;S.page="inst";enter("mods","inst")},true);
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a=create]");if(!el)return;const n=(document.getElementById("nn").value.trim()||"Sleep "+document.getElementById("nv").value);
  if(S.nf.ico&&(S.nf.ico.bg||S.nf.ico.img||S.nf.ico.g)){ICO[n]=S.nf.ico;saveIco()}setTimeout(()=>{S.nf.ico=null},50)},true);
-document.addEventListener("click",e=>{const el=e.target.closest("[data-a^=kic]");if(!el)return;e.stopPropagation();const nn=document.getElementById("nn");if(nn)S.nf.name=nn.value;
- const a=el.dataset.a,v=el.dataset.v,m=S.nf.ico=S.nf.ico||{};
- if(a=="kicbg"){m.bg=v;delete m.img;m.g=m.g||"cube"}else if(a=="kicg"){m.g=v;delete m.img;m.bg=m.bg||BGS2[0]}else if(a=="kicx")S.nf.ico=null;render()},true);
-document.addEventListener("change",async e=>{const t=e.target;if(t.id!="kicf"||!t.files[0])return;e.stopImmediatePropagation();const nn=document.getElementById("nn");if(nn)S.nf.name=nn.value;
- S.nf.ico={img:await shrink(t.files[0],128,128,true)};render()},true);
+document.addEventListener("click",e=>{const el=e.target.closest("[data-a^=kic]");if(!el)return;e.stopPropagation();const ed=S.page=="inst"&&S.tab=="xcfg"&&X.cfg,H=ed?X.cfg:S.nf,nn=document.getElementById(ed?"cn":"nn");if(nn)H.name=nn.value;
+ const a=el.dataset.a,v=el.dataset.v,m=H.ico=H.ico||{};
+ if(a=="kicbg"){m.bg=v;delete m.img;m.g=m.g||"cube"}else if(a=="kicg"){m.g=v;delete m.img;m.bg=m.bg||BGS2[0]}else if(a=="kicx")H.ico=null;render()},true);
+document.addEventListener("change",async e=>{const t=e.target;if(t.id!="kicf"||!t.files[0])return;e.stopImmediatePropagation();const ed=S.page=="inst"&&S.tab=="xcfg"&&X.cfg,H=ed?X.cfg:S.nf,nn=document.getElementById(ed?"cn":"nn");if(nn)H.name=nn.value;
+ H.ico={img:await shrink(t.files[0],128,128,true)};render()},true);
+
+/* definições da instância: nome + ícone iguais ao da criação (letra, cor, símbolo ou imagem tua) */
+const _xCfgV=xCfgV;
+xCfgV=function(){const c=X.cfg;let h=_xCfgV();if(!c)return h;
+ if(c.ico===undefined)c.ico=ICO[S.cur]?JSON.parse(JSON.stringify(ICO[S.cur])):null;
+ const i=h.indexOf('<div class="tag" style="margin-top:12px">Ícone</div>');if(i<0)return h;
+ const k=h.indexOf('</div></div>',i);if(k<0)return h;
+ const pk=`<div class="tag" style="margin-top:12px">Ícone</div><div class="icopick"><div class="icoprev">${icoHTML("",64,c.ico)||ibox(c.name||"Nova","")}</div><div class="icoctl"><div class="icobgs">${BGS2.map(b=>`<button class="icobg ${c.ico&&c.ico.bg==b?"act":""}" data-a="kicbg" data-v="${b}" style="background:${b}"></button>`).join("")}</div><div class="icogs">${Object.keys(GL).map(g=>`<button class="icog ${c.ico&&c.ico.g==g?"act":""}" data-a="kicg" data-v="${g}"><svg viewBox="0 0 24 24">${GL[g]}</svg></button>`).join("")}</div><div class="row"><label class="btn">Carregar imagem<input type="file" id="kicf" accept="image/*" hidden></label>${c.ico?`<button class="btn" data-a="kicx">Tirar</button>`:""}</div></div></div>`;
+ return h.slice(0,i)+pk+h.slice(k)};
+const _xSave=xSave;
+xSave=async function(){const c=X.cfg,old=S.cur,ic=c&&c.ico;await _xSave();
+ if(c&&ic!==undefined){if(old!=S.cur)delete ICO[old];if(ic&&(ic.bg||ic.img||ic.g))ICO[S.cur]=ic;else delete ICO[S.cur];saveIco();xInitCfg();render()}};
 
 /* ---------- importar instâncias de outros launchers (CurseForge, Modrinth App, Prism, ATLauncher, .minecraft...) ---------- */
 S.imp={list:[],pick:{},ver:{},ldr:{},busy:false,asked:false};
@@ -407,7 +419,7 @@ document.addEventListener("change",e=>{const t=e.target;if(t.id=="mi"){e.stopImm
 const capeImg={},capeBusy={};let capeV=null,capeQ=Promise.resolve();
 function capeSnap(url){if(capeImg[url])return Promise.resolve(capeImg[url]);
  return capeQ=capeQ.then(async()=>{if(capeImg[url])return capeImg[url];
-  const b64=T?await inv("img_b64",{url}):null;if(!b64&&T)throw 0;const src=T?"data:image/png;base64,"+b64:url;
+  const b64=T?await inv(/textures\.minecraft\.net/.test(url)?"skin_b64":"img_b64",{url}):null;if(!b64&&T)throw 0;const src=T?"data:image/png;base64,"+b64:url;
   if(!capeV){capeV=new skinview3d.SkinViewer({width:260,height:300,renderPaused:true,preserveDrawingBuffer:true});capeV.zoom=.95;await capeV.loadSkin(await steveGet(),{model:"default"})}
   await capeV.loadCape(src);capeV.playerObject.rotation.y=Math.PI-.55;capeV.camera.rotation.x=-.08;capeV.render();
   return capeImg[url]=capeV.canvas.toDataURL("image/png")});}
@@ -581,11 +593,35 @@ function galView(m){const o=document.createElement("div");o.className="glb";cons
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a=kmf],[data-a=kmr],[data-a=kmo]");if(!el)return;e.stopPropagation();const a=el.dataset.a;
  if(a=="kmf"){S.mf=el.dataset.v;render()}else if(a=="kmr"){S.media=null;render()}else{const p=decodeURIComponent(el.dataset.p),m=(S.media||[]).find(x=>x.path==p);if(m)galView(m)}},true);
 
-/* ---------- atualização do launcher ---------- */
-async function checkUpd(){try{const u=await inv("app_check_update");if(!u||!u.version||document.getElementById("kupd"))return;
- const b=document.createElement("div");b.id="kupd";b.innerHTML=`<span><b>Nova versão do launcher</b> · ${u.version}</span><button class="btn p" data-u="go">Atualizar agora</button><button class="btn" data-u="x">Depois</button>`;
- b.addEventListener("click",async e=>{const g=e.target.closest("[data-u]");if(!g)return;if(g.dataset.u=="x")return b.remove();g.disabled=true;toast("A atualizar o launcher…",1);try{await inv("app_install_update")}catch(x){g.disabled=false;toast(er(x))}});
- document.body.appendChild(b)}catch(e){}}
-if(T)setTimeout(checkUpd,4000);
+/* ---------- atualização automática do launcher ---------- */
+function showUpd(v,err){let b=document.getElementById("kupd");if(!b){b=document.createElement("div");b.id="kupd";document.body.appendChild(b)}
+ b.innerHTML=err?`<div class="ubox"><b>Não foi possível atualizar. Tenta outra vez mais tarde.</b><div class="row" style="justify-content:flex-end"><button class="btn" data-u="x">Fechar</button></div></div>`
+ :`<div class="ubox"><img src="img/mascot.png" alt=""><b>A atualizar o Sleep Launcher</b><span class="tag">Versão ${esc(v||"")} · não feches a janela, abre sozinho quando acabar.</span><div class="ubar"><i id="kubar"></i></div></div>`;
+ if(!b.dataset.h){b.dataset.h=1;b.addEventListener("click",e=>{if(e.target.closest("[data-u=x]")){b.remove();S.updBusy=false}})}}
+if(T)T.event.listen("progress",ev=>{const p=ev.payload;if(p&&p.stage=="Launcher"){const e=document.getElementById("kubar");if(e)e.style.width=Math.min(100,Math.round(p.done*100/Math.max(1,p.total)))+"%"}});
+async function autoUpd(){if(!T||S.updBusy)return;try{const u=await inv("app_check_update");if(!u||!u.version)return;S.updBusy=true;showUpd(u.version);await inv("app_install_update")}catch(x){showUpd(null,String(x))}}
+if(T){setTimeout(autoUpd,1500);setInterval(autoUpd,30*60*1000)}
+/* ecrã maximizado fica igual ao normal: a página é ampliada em proporção ao tamanho da janela */
+async function fitZoom(){try{const A=window.__TAURI__;if(!A||!A.window||!A.webview)return;const w=A.window.getCurrentWindow(),[sz,sf]=await Promise.all([w.innerSize(),w.scaleFactor()]);
+ const W=sz.width/sf,H=sz.height/sf,f=Math.round(Math.min(2,Math.max(1,Math.min(W/1160,H/740)))*20)/20;
+ if(Math.abs((S.zf||1)-f)>.001){S.zf=f;await A.webview.getCurrentWebview().setZoom(f)}}catch(e){}}
+addEventListener("resize",()=>{clearTimeout(S.zt);S.zt=setTimeout(fitZoom,150)});setTimeout(fitZoom,400);
+
+/* ---------- ícone da app (como o Discord): presets feitos com a mascote + imagem tua ---------- */
+const AIC=[["Padrão","#4a67e8","#1f2a5a"],["Noite","#232a5c","#0b0e24"],["Pôr do sol","#ff9966","#7a3fc4"],["Oceano","#2dd4bf","#1a4f9c"],["Floresta","#4ccf68","#134b2a"],["Doce","#ff6bb5","#8f4be0"],["Ouro","#f5c542","#c46a1c"],["Carvão","#3a3d4a","#101118"],["Gelo","#dff3ff","#7fb6ff"],["Sangue","#ff5a5f","#6a0f1c"]];
+const MASC=new Image();MASC.src="img/mascot.png";
+function mkIcon(c1,c2){const c=document.createElement("canvas");c.width=c.height=512;const g=c.getContext("2d"),r=112;g.beginPath();g.moveTo(r,0);g.arcTo(512,0,512,512,r);g.arcTo(512,512,0,512,r);g.arcTo(0,512,0,0,r);g.arcTo(0,0,512,0,r);g.closePath();
+ const gr=g.createLinearGradient(0,0,512,512);gr.addColorStop(0,c1);gr.addColorStop(1,c2);g.fillStyle=gr;g.fill();g.save();g.clip();
+ if(MASC.naturalWidth){const s=400;g.drawImage(MASC,56,64,s,s)}g.restore();return c.toDataURL("image/png")}
+let AIU={};const aiUrl=i=>AIU[i]||(AIU[i]=mkIcon(AIC[i][1],AIC[i][2]));
+async function useAppIcon(url,save){try{await inv("set_app_icon",{b64:url.split(",")[1]});if(save)S.aiSel=save;lsSet("kubo.appicon",JSON.stringify(save))}catch(x){toast("Não foi possível mudar o ícone.")}}
+function aiSection(){const sel=S.aiSel||{p:0};return`<h3 class="vh">Ícone da app</h3><p class="tag">Muda o ícone do Sleep no Dock e na barra de tarefas. Escolhe um, ou carrega uma imagem tua.</p><div class="aigrid">${AIC.map((a,i)=>`<button class="aitile ${sel.p===i?"act":""}" data-a="kai" data-v="${i}" title="${esc(a[0])}"><img src="${aiUrl(i)}" alt=""></button>`).join("")}${sel.c?`<button class="aitile act" data-a="kai" data-v="c" title="A tua imagem"><img src="${sel.c}" alt=""></button>`:""}<label class="aitile aiup" title="Carregar imagem">+<input type="file" id="kaif" accept="image/*" hidden></label></div>`}
+const _vSet3=vSet;vSet=function(){const h=_vSet3();return h.replace(/<\/div>\s*$/,aiSection()+"</div>")};
+document.addEventListener("click",e=>{const el=e.target.closest("[data-a=kai]");if(!el)return;e.stopPropagation();const v=el.dataset.v;
+ if(v=="c"&&S.aiSel&&S.aiSel.c){useAppIcon(S.aiSel.c,S.aiSel)}else{const i=+v;useAppIcon(aiUrl(i),{p:i})}render()},true);
+document.addEventListener("change",async e=>{const t=e.target;if(t.id!="kaif"||!t.files[0])return;e.stopImmediatePropagation();
+ const u=await shrink(t.files[0],512,512,true);useAppIcon(u,{c:u});render()},true);
+try{const sv=JSON.parse(lsGet("kubo.appicon","null"));if(sv){S.aiSel=sv;MASC.onload=()=>setTimeout(()=>{const u=sv.c||(sv.p!=null&&sv.p>0?aiUrl(sv.p):null);if(u&&T)inv("set_app_icon",{b64:u.split(",")[1]}).catch(()=>{})},800);if(MASC.complete)MASC.onload()}}catch(e){}
+
 inv("get_account").then(a=>{S.acc=a}).catch(()=>{}).finally(()=>{S.ready=true;render();intro()});
 })();

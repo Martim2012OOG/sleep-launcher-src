@@ -1,13 +1,13 @@
 [package]
 name = "kubo-launcher"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
+tauri = { version = "2", features = ["tray-icon", "protocol-asset", "image-png"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
@@ -28,3 +28,6 @@ md5 = "0.7"
 opt-level = 0
 debug = 0
 incremental = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"

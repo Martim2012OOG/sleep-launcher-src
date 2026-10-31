@@ -1,6 +1,6 @@
 {
   "productName": "Sleep Launcher",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "identifier": "app.kubo.launcher",
   "build": {
     "frontendDist": "../src"

@@ -1,1 +1,1 @@
-{"identifier": "default", "windows": ["main"], "permissions": ["core:default", "core:window:allow-start-dragging", "core:window:allow-minimize", "core:window:allow-toggle-maximize", "updater:default"]}
+{"identifier": "default", "windows": ["main"], "permissions": ["core:default", "core:window:allow-start-dragging", "core:window:allow-minimize", "core:window:allow-toggle-maximize", "updater:default", "core:webview:allow-set-webview-zoom", "core:window:allow-set-icon"]}
