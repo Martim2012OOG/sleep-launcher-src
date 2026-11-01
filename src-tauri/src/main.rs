@@ -187,7 +187,7 @@ async fn http_get(url: String) -> Result<String, String> {
 async fn img_b64(url: String) -> Result<String, String> {
     use base64::{engine::general_purpose::STANDARD, Engine};
     let host = url.strip_prefix("https://").and_then(|r| r.split('/').next()).unwrap_or("").to_lowercase();
-    let bad = host.is_empty() || host.contains('@') || host.starts_with("localhost") || host.ends_with(".local") || host.split(':').next().map(|h| h.chars().all(|c| c.is_ascii_digit() || c == '.')).unwrap_or(true);
+    let bad = host.is_empty() || host.contains('@') || host.starts_with("localhost") || host.ends_with(".local") || host.split(':').next().map(|h| h.chars().all(|c| c.is_ascii_digit() || c == '.')).unwrap_or(false);
     if bad {
         return Err("endereço não permitido".to_string());
     }
@@ -697,7 +697,7 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
         };
         mods::purge_visible(&game.join("mods"));
         // mods de FPS (Sodium, Lithium...) da Modrinth, só os que a instância ainda não tem
-        let fps_on = settings(&app)["fps_boost"].as_bool().unwrap_or(true);
+        let fps_on = settings(&app)["fps_boost"].as_bool().unwrap_or(false);
         if let Ok(Err(x)) = tokio::time::timeout(std::time::Duration::from_secs(40), mods::sync_perf(&url, &mc, &hidden, &game.join("mods"), fps_on)).await {
             note = format!("{note} · fps: {x}");
         }
