@@ -18,6 +18,10 @@ Não, fechar a app|No, close the app|No, cerrar la app
 Sim, atualizar|Yes, update|Sí, actualizar
 Fechar a app|Close the app|Cerrar la app
 Tentar outra vez|Try again|Intentar de nuevo
+Instala e abre (mcpelauncher)|Installs and opens it (mcpelauncher)|Lo instala y lo abre (mcpelauncher)
+A descarregar o mcpelauncher para o Bedrock (só da primeira vez)…|Downloading mcpelauncher for Bedrock (first time only)…|Descargando mcpelauncher para Bedrock (solo la primera vez)…
+Pronto. A abrir o Bedrock. Entra com a conta Google Play onde o compraste.|Done. Opening Bedrock. Sign in with the Google Play account where you bought it.|Listo. Abriendo Bedrock. Entra con la cuenta de Google Play donde lo compraste.
+Não foi possível preparar o Bedrock: |Could not set up Bedrock: |No se pudo preparar Bedrock: 
 Minecraft Bedrock|Minecraft Bedrock|Minecraft Bedrock
 Abre o Bedrock instalado|Opens the Bedrock you installed|Abre el Bedrock instalado
 Como jogar Bedrock aqui|How to play Bedrock here|Cómo jugar Bedrock aquí

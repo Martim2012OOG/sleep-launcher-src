@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod auth;
+mod bedrock;
 mod console;
 mod curseforge;
 mod fabric;
@@ -823,18 +824,22 @@ fn open_url(url: String) -> Result<(), String> {
     open_path(&url)
 }
 
-/// Abre o Minecraft Bedrock já instalado (só Windows: o Bedrock é da Microsoft Store). Nos outros sistemas devolve erro e a interface mostra o guia.
+/// Estado do Bedrock neste computador: {os, installed}.
 #[tauri::command]
-fn bedrock_launch() -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        std::process::Command::new("cmd").args(["/C", "start", "", "minecraft:"]).creation_flags(0x08000000).spawn().map(|_| ()).map_err(|e| e.to_string())
-    }
-    #[cfg(not(windows))]
-    {
-        Err("só no Windows".into())
-    }
+fn bedrock_state(app: AppHandle) -> Value {
+    bedrock::state(&app)
+}
+
+/// Mac / Linux: descarrega o mcpelauncher (app oficial do projeto) e deixa-o pronto. No Windows o Bedrock vem da Microsoft Store.
+#[tauri::command]
+async fn bedrock_install(app: AppHandle) -> Result<(), String> {
+    bedrock::install(&app).await
+}
+
+/// Abre o Bedrock (Windows: o instalado da Store; Mac / Linux: o mcpelauncher).
+#[tauri::command]
+fn bedrock_launch(app: AppHandle) -> Result<(), String> {
+    bedrock::launch(&app)
 }
 
 // ---------- separadores da instância (passo 9B) ----------
@@ -1022,6 +1027,8 @@ fn main() {
             app_install_update,
             quit_app,
             bedrock_launch,
+            bedrock_state,
+            bedrock_install,
             media_list,
             media_delete,
             media_reveal,
