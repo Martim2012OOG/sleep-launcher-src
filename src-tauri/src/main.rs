@@ -55,7 +55,7 @@ fn write_inst(dir: &Path, v: &Value) -> Result<(), String> {
 /// Repositório do GitHub onde saem as versões (definido ao compilar com KUBO_REPO="dono/repo").
 pub const REPO: &str = match option_env!("KUBO_REPO") {
     Some(r) => r,
-    None => "kubo-client/kubo",
+    None => "Martim2012OOG/sleep-launcher",
 };
 
 /// Manifesto das mods do Sleep: o mods.json da release fixa "mods" (atualizado pelo CI do client, sem lançar o launcher).
