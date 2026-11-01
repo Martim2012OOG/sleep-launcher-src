@@ -50,12 +50,15 @@ jobs:
 
       - uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # o código fica neste repositório PRIVADO; os instaladores vão para o repositório público só de downloads
+          GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           KUBO_CF_KEY: ${{ secrets.KUBO_CF_KEY }}
-          KUBO_REPO: ${{ github.repository }}
+          KUBO_REPO: Martim2012OOG/sleep-launcher
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          owner: Martim2012OOG
+          repo: sleep-launcher
           tagName: ${{ github.ref_name }}
           releaseName: Sleep Launcher ${{ github.ref_name }}
           releaseBody: Instala o ficheiro do teu sistema. Quem já tem o launcher recebe esta versão sozinho.

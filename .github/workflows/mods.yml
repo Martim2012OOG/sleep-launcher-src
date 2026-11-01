@@ -15,11 +15,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Gerar mods.json
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 tools/make_mods_manifest.py "${{ github.repository }}" mods
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: python3 tools/make_mods_manifest.py "Martim2012OOG/sleep-launcher" mods
       - name: Publicar
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: |
-          gh release view mods >/dev/null 2>&1 || gh release create mods --title "Mods" --notes "Ficheiros que o launcher descarrega sozinho. Não apagar." --prerelease
-          gh release upload mods dist-mods/* --clobber
+          R=Martim2012OOG/sleep-launcher
+          gh release view mods --repo $R >/dev/null 2>&1 || gh release create mods --repo $R --title "Mods" --notes "Ficheiros que o launcher descarrega sozinho. Não apagar." --prerelease
+          gh release upload mods dist-mods/* --repo $R --clobber
