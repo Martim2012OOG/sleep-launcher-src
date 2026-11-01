@@ -5,6 +5,12 @@
 (function(){
 const LANGS=[["en","English","🇬🇧"],["pt","Português (Portugal)","🇵🇹"],["es","Español","🇪🇸"]];
 const TABLE=`A preparar o jogo… (a primeira vez demora um pouco)|Getting the game ready… (the first time takes a while)|Preparando el juego… (la primera vez tarda un poco)
+Fundo da página inicial|Home page background|Fondo de la página de inicio
+Cena 3D que aparece atrás do teu boneco. Automático: Natal de 1 de novembro a 31 de dezembro, o resto do ano a cena normal.|3D scene shown behind your character. Automatic: Christmas from 1 November to 31 December, the normal scene the rest of the year.|Escena 3D que aparece detrás de tu personaje. Automático: Navidad del 1 de noviembre al 31 de diciembre, el resto del año la escena normal.
+Automático|Automatic|Automático
+Natal|Christmas|Navidad
+FNAF|FNAF|FNAF
+Imagem clássica|Classic image|Imagen clásica
 Ícone da app|App icon|Icono de la app
 Muda o ícone do Sleep no Dock e na barra de tarefas. Escolhe um, ou carrega uma imagem tua.|Change the Sleep icon in the Dock and taskbar. Pick one, or upload your own image.|Cambia el icono de Sleep en el Dock y la barra de tareas. Elige uno o sube tu imagen.
 Não foi possível mudar o ícone.|Could not change the icon.|No se pudo cambiar el icono.
