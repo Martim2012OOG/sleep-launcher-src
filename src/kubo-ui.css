@@ -465,7 +465,9 @@ body.starting .btn[data-a=play],body.starting .lbig{pointer-events:none;opacity:
 body.starting .btn[data-a=play]::before,body.starting .lbig::before{content:"";display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-2px;animation:kspin .8s linear infinite}
 @keyframes kspin{to{transform:rotate(360deg)}}
 
-/* fundo 3D da página inicial */
-.hero.h3d{isolation:isolate;background:radial-gradient(120% 90% at 50% 20%,#18214d,#070a1c 70%)}
-.hero .hmv{position:absolute;inset:0;width:100%;height:100%;z-index:-1;background:transparent;--poster-color:transparent;outline:none}
-.hero.h3d::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(6,10,40,0) 55%,rgba(6,10,40,.65))}
+/* fundo 3D da página inicial: o cenário e o boneco são 3D no mesmo mundo */
+.hero.h3d{isolation:isolate;background:linear-gradient(180deg,#0b0f22,#05060f)}
+.hero .k3d{position:absolute;inset:0;width:100%;height:100%;z-index:-1;display:block;cursor:grab;touch-action:none}
+.hero .k3d:active{cursor:grabbing}
+.hero.h3d .fig{display:none}
+.hero.h3d::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(6,10,40,0) 62%,rgba(6,10,30,.55))}

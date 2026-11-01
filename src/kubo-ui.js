@@ -636,17 +636,16 @@ try{const sv=JSON.parse(lsGet("kubo.appicon","null"));if(sv){S.aiSel=sv;MASC.onl
 /* ---------- fundo 3D da página inicial (no lugar da foto): Natal de 1 nov a 31 dez, depois a cena normal; dá para escolher nas definições ---------- */
 const HERO=[["auto","Automático"],["christmas","Natal"],["fnaf","FNAF"],["image","Imagem clássica"]];
 const heroKey=()=>{const v=lsGet("kubo.hero","auto");if(v&&v!="auto")return v;const m=new Date().getMonth();return m>=10?"christmas":"fnaf"};
-let MV=null,MVsrc="",MVload=null;
-function heroApply(){const h=document.querySelector(".hero");if(!h)return;const k=heroKey();
- if(k=="image"){if(MV&&MV.parentNode)MV.remove();h.classList.remove("h3d");return}
- if(!MVload)MVload=import("./vendor/model-viewer.min.js").catch(()=>{});
- if(!MV){MV=document.createElement("model-viewer");MV.className="hmv";
-  for(const [a,v] of [["auto-rotate",""],["camera-controls",""],["disable-zoom",""],["disable-pan",""],["interaction-prompt","none"],["shadow-intensity","0"],["exposure","1.15"],["rotation-per-second","5deg"],["camera-orbit","20deg 78deg 105%"],["loading","eager"]])MV.setAttribute(a,v)}
- const src="img/scenes/"+k+".glb";if(MVsrc!=src){MVsrc=src;
-  /* o diorama de Natal está longe da origem (o ficheiro tem um objeto solto), por isso a câmara aponta-lhe diretamente */
-  const cam=k=="christmas"?{"camera-orbit":"28deg 74deg 30m","camera-target":"36.6m 1.8m -2.2m","min-camera-orbit":"auto 40deg 8m","max-camera-orbit":"auto 95deg 45m","field-of-view":"35deg"}:{"camera-orbit":"20deg 78deg 105%","camera-target":"auto auto auto","min-camera-orbit":"auto 30deg auto","max-camera-orbit":"auto 100deg auto","field-of-view":"auto"};
-  for(const a in cam)MV.setAttribute(a,cam[a]);MV.setAttribute("src",src)}
- if(MV.parentNode!==h)h.insertBefore(MV,h.firstChild);h.classList.add("h3d")}
+let K3L=null,K3S="";
+function heroApply(){const h=document.querySelector(".hero");if(!h){if(window.K3D)K3D.pause();return}const k=heroKey();
+ if(k=="image"){if(window.K3D)K3D.pause();h.classList.remove("h3d");return}
+ if(!K3L)K3L=new Promise(r=>{const s=document.createElement("script");s.src="vendor/scene3d.js";s.onload=()=>r(1);s.onerror=()=>r(0);document.head.appendChild(s)});
+ K3L.then(ok=>{if(!ok||!window.K3D)return;const hh=document.querySelector(".hero");if(!hh)return;
+  /* o boneco é 3D dentro do cenário, com a tua skin */
+  const im=S.skin&&S.skin.naturalWidth?S.skin:null;const sk=(S.acc&&S.acc.skins||[]).find(x=>x.state=="ACTIVE");
+  const use=im||(STEVE&&STEVE.naturalWidth?STEVE:null);
+  hh.classList.add("h3d");
+  K3D.mount(hh,{scene:k,skin:use,slim:!!(sk&&sk.variant=="SLIM")})})}
 function heroSection(){const cur=lsGet("kubo.hero","auto")||"auto";return`<h3 class="vh">Fundo da página inicial</h3><p class="tag">Cena 3D que aparece atrás do teu boneco. Automático: Natal de 1 de novembro a 31 de dezembro, o resto do ano a cena normal.</p><div class="row" style="gap:8px;flex-wrap:wrap">${HERO.map(h=>`<button class="btn ${cur===h[0]?"p":""}" data-a="khero" data-v="${h[0]}">${h[1]}</button>`).join("")}</div>`}
 const _vSet4=vSet;vSet=function(){const h=_vSet4();return h.replace(/<\/div>\s*$/,heroSection()+"</div>")};
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a=khero]");if(!el)return;e.stopPropagation();lsSet("kubo.hero",el.dataset.v);render();heroApply()},true);
