@@ -459,3 +459,8 @@ body{background-attachment:scroll}
 .aitile.act{border-color:var(--accent,#4a67e8)}
 .aitile.aiup{display:grid;place-items:center;border:2px dashed rgba(255,255,255,.3);font-size:26px;color:#9aa3c7}
 .tabs{flex-wrap:wrap;overflow:visible}
+
+/* carregaste em Play: o botão mostra logo que está a trabalhar (e não deixa carregar duas vezes) */
+body.starting .btn[data-a=play],body.starting .lbig{pointer-events:none;opacity:.78}
+body.starting .btn[data-a=play]::before,body.starting .lbig::before{content:"";display:inline-block;width:14px;height:14px;margin-right:8px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-2px;animation:kspin .8s linear infinite}
+@keyframes kspin{to{transform:rotate(360deg)}}

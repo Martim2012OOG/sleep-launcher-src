@@ -685,7 +685,10 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
         let url = settings(&app)["manifest_url"].as_str().filter(|s| !s.trim().is_empty()).map(String::from).unwrap_or_else(default_manifest);
         // fica escondida na pasta de dados do launcher (nunca em game/mods) e o Fabric Loader vai buscá-la por -Dfabric.addMods
         let hidden = root(&app)?.join("kubo-mods").join(&mc);
-        note = mods::sync(&url, &mc, &hidden).await.unwrap_or_else(|x| format!("mods: {x}"));
+        note = match tokio::time::timeout(std::time::Duration::from_secs(45), mods::sync(&url, &mc, &hidden)).await {
+            Ok(r) => r.unwrap_or_else(|x| format!("mods: {x}")),
+            Err(_) => "mods: sem resposta, a usar os que já tens".to_string(),
+        };
         mods::purge_visible(&game.join("mods"));
         let list = mods::jar_list(&hidden);
         if !list.is_empty() {

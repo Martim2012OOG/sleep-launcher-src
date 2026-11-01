@@ -30,7 +30,8 @@ pub async fn sync(url: &str, mc: &str, mods: &Path) -> Result<String, String> {
         let target = mods.join(&name);
         let ok = std::fs::read(&target).map(|b| hex(&b).eq_ignore_ascii_case(h)).unwrap_or(false);
         if !ok {
-            let b = reqwest::get(u).await.map_err(e)?.error_for_status().map_err(e)?.bytes().await.map_err(e)?;
+            let cl = reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(20)).timeout(std::time::Duration::from_secs(600)).build().map_err(e)?;
+            let b = cl.get(u).send().await.map_err(e)?.error_for_status().map_err(e)?.bytes().await.map_err(e)?;
             if !hex(&b).eq_ignore_ascii_case(h) {
                 return Err(format!("SHA1 errado no mod {id}"));
             }

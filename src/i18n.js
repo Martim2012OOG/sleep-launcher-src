@@ -4,7 +4,8 @@
    Textos com números (ex.: "Faltam 50") usam as regras de PADRÕES mais abaixo. Para um idioma novo: nova coluna + entrada em LANGS. */
 (function(){
 const LANGS=[["en","English","🇬🇧"],["pt","Português (Portugal)","🇵🇹"],["es","Español","🇪🇸"]];
-const TABLE=`Ícone da app|App icon|Icono de la app
+const TABLE=`A preparar o jogo… (a primeira vez demora um pouco)|Getting the game ready… (the first time takes a while)|Preparando el juego… (la primera vez tarda un poco)
+Ícone da app|App icon|Icono de la app
 Muda o ícone do Sleep no Dock e na barra de tarefas. Escolhe um, ou carrega uma imagem tua.|Change the Sleep icon in the Dock and taskbar. Pick one, or upload your own image.|Cambia el icono de Sleep en el Dock y la barra de tareas. Elige uno o sube tu imagen.
 Não foi possível mudar o ícone.|Could not change the icon.|No se pudo cambiar el icono.
 A atualizar o Sleep Launcher|Updating Sleep Launcher|Actualizando Sleep Launcher

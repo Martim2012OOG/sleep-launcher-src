@@ -48,8 +48,26 @@ fn arch_ok(name: &str) -> bool {
     true
 }
 
+/// Cliente com tempos limite: uma ligação lenta ou presa já não deixa o launcher a "pensar" para sempre.
+fn client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(20)).timeout(std::time::Duration::from_secs(300)).user_agent("SleepLauncher/1.0").build().map_err(e)
+}
+
 pub async fn fetch_json(url: &str) -> Result<Value, String> {
-    reqwest::get(url).await.map_err(e)?.error_for_status().map_err(e)?.json().await.map_err(e)
+    let mut last = String::new();
+    for _ in 0..3 {
+        match client()?.get(url).send().await {
+            Ok(r) => match r.error_for_status() {
+                Ok(r) => match r.json().await {
+                    Ok(v) => return Ok(v),
+                    Err(x) => last = x.to_string(),
+                },
+                Err(x) => last = x.to_string(),
+            },
+            Err(x) => last = x.to_string(),
+        }
+    }
+    Err(last)
 }
 
 pub async fn get_file(url: &str, path: &Path) -> Result<(), String> {
@@ -59,7 +77,24 @@ pub async fn get_file(url: &str, path: &Path) -> Result<(), String> {
     if let Some(p) = path.parent() {
         tokio::fs::create_dir_all(p).await.map_err(e)?;
     }
-    let b = reqwest::get(url).await.map_err(e)?.error_for_status().map_err(e)?.bytes().await.map_err(e)?;
+    let mut got = None;
+    let mut last = String::new();
+    for _ in 0..3 {
+        match client()?.get(url).send().await {
+            Ok(r) => match r.error_for_status() {
+                Ok(r) => match r.bytes().await {
+                    Ok(b) => {
+                        got = Some(b);
+                        break;
+                    }
+                    Err(x) => last = x.to_string(),
+                },
+                Err(x) => last = x.to_string(),
+            },
+            Err(x) => last = x.to_string(),
+        }
+    }
+    let b = got.ok_or(last)?;
     let tmp = path.with_extension("part");
     tokio::fs::write(&tmp, &b).await.map_err(e)?;
     tokio::fs::rename(&tmp, path).await.map_err(e)
