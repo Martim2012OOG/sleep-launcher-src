@@ -187,7 +187,7 @@ async fn http_get(url: String) -> Result<String, String> {
 async fn img_b64(url: String) -> Result<String, String> {
     use base64::{engine::general_purpose::STANDARD, Engine};
     let host = url.strip_prefix("https://").and_then(|r| r.split('/').next()).unwrap_or("").to_lowercase();
-    let bad = host.is_empty() || host.contains('@') || host.starts_with("localhost") || host.ends_with(".local") || host.split(':').next().map(|h| h.chars().all(|c| c.is_ascii_digit() || c == '.')).unwrap_or(false);
+    let bad = host.is_empty() || host.contains('@') || host.starts_with("localhost") || host.ends_with(".local") || host.split(':').next().map(|h| h.chars().all(|c| c.is_ascii_digit() || c == '.')).unwrap_or(true);
     if bad {
         return Err("endereço não permitido".to_string());
     }
