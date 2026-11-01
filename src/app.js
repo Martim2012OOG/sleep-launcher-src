@@ -112,7 +112,8 @@ document.addEventListener("click",async e=>{const el=e.target.closest("[data-a]"
  else if(a=="auto"){S.auto=!S.auto;render();inv("set_autostart",{enabled:S.auto}).then(r=>{S.auto=r;render()}).catch(()=>{})}
  else if(a=="login")run(()=>inv("ms_login"))
  else if(a=="logout"){inv("ms_logout").catch(()=>{});S.acc=null;S.skin=null;render()}
- else if(a=="cape")run(()=>inv("set_cape",{capeId:v||null}))
+ else if(a=="cape"){if(S.capeWait&&Date.now()<S.capeWait)return;S.capeWait=Date.now()+(S.capeCool||0)+2500;
+  run(async()=>{try{const r=await inv("set_cape",{capeId:v||null});S.capeCool=0;S.capeWait=Date.now()+800;return r}catch(x){if(/429/.test(String(x))){S.capeCool=45000;S.capeWait=Date.now()+45000;throw "A Mojang limitou os pedidos de capa. Espera cerca de 1 minuto e tenta outra vez."}S.capeWait=0;throw x}})}
  else if(a=="saveci"){S.ci=document.getElementById("ci").value.trim();try{await inv("save_client_id",{clientId:S.ci});toast("Guardado.")}catch(x){toast(er(x))}}
  else if(a=="savecf"){const k=document.getElementById("cfk").value.trim();if(!k)return;try{await inv("save_cf_key",{key:k});S.hasCf=true;toast("Chave guardada.")}catch(x){toast(er(x))}render()}
  else if(a=="savesk"){const k=document.getElementById("ssk").value.trim();if(!k)return;try{await inv("save_social_key",{key:k});S.hasSk=true;toast("Chave guardada.");if(S.acc){socialStop()}}catch(x){toast(er(x))}render()}

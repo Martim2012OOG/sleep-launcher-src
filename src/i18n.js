@@ -5,6 +5,7 @@
 (function(){
 const LANGS=[["en","English","🇬🇧"],["pt","Português (Portugal)","🇵🇹"],["es","Español","🇪🇸"]];
 const TABLE=`A preparar o jogo… (a primeira vez demora um pouco)|Getting the game ready… (the first time takes a while)|Preparando el juego… (la primera vez tarda un poco)
+A Mojang limitou os pedidos de capa. Espera cerca de 1 minuto e tenta outra vez.|Mojang is limiting cape requests. Wait about a minute and try again.|Mojang limitó las peticiones de capa. Espera un minuto e inténtalo de nuevo.
 Fundo da página inicial|Home page background|Fondo de la página de inicio
 Cena 3D que aparece atrás do teu boneco. Automático: Natal de 1 de novembro a 31 de dezembro, o resto do ano a cena normal.|3D scene shown behind your character. Automatic: Christmas from 1 November to 31 December, the normal scene the rest of the year.|Escena 3D que aparece detrás de tu personaje. Automático: Navidad del 1 de noviembre al 31 de diciembre, el resto del año la escena normal.
 Automático|Automatic|Automático

@@ -26,7 +26,8 @@ function kcard(id,kind,title,sub,pct,life){let c=kcards.get(id);
  const bar=c.querySelector(".kbar");bar.style.display=pct===undefined?"none":"";bar.classList.toggle("ind",pct===null);if(typeof pct==="number")bar.firstChild.style.width=Math.max(2,Math.min(100,pct))+"%";
  clearTimeout(c.__t);if(life)c.__t=setTimeout(()=>kclose(id),life)}
 function kclose(id){const c=kcards.get(id);if(!c)return;kcards.delete(id);clearTimeout(c.__t);c.classList.add("out");setTimeout(()=>c.remove(),200)}
-toast=function(m,keep){const t0=String(m),pm=t0.match(/^(.+?) (\d+)\/(\d+)$/);
+let _lastToast={m:"",t:0};
+toast=function(m,keep){const t0=String(m);if(!/ \d+\/\d+$/.test(t0)){if(_lastToast.m===t0&&Date.now()-_lastToast.t<8000)return;_lastToast={m:t0,t:Date.now()}}const pm=t0.match(/^(.+?) (\d+)\/(\d+)$/);
  if(pm){const id="prog";if(kdis.has(id))return;const d=+pm[2],tot=+pm[3]||1,pct=d/tot*100;
   if(d>=tot){kcard(id,"good","Instalação concluída","",100,2800);return}
   kcard(id,"prog","A instalar…",pm[1].replace(/^./,x=>x.toUpperCase())+" · "+Math.round(pct)+"%",pct);return}
@@ -416,7 +417,7 @@ document.addEventListener("click",e=>{const el=e.target.closest(".nv[data-v=mods
 document.addEventListener("change",e=>{const t=e.target;if(t.id=="mi"){e.stopImmediatePropagation();S.cur=t.value;enter("mods","browse")}},true);
 
 /* ---------- capas da loja em 3D (uma foto 3D de cada capa, vista de trás) ---------- */
-const capeImg={},capeBusy={};let capeV=null,capeQ=Promise.resolve();
+const capeImg={},capeBusy={},capeTry={};let capeV=null,capeQ=Promise.resolve();
 function capeSnap(url){if(capeImg[url])return Promise.resolve(capeImg[url]);
  return capeQ=capeQ.then(async()=>{if(capeImg[url])return capeImg[url];
   const b64=T?await inv(/textures\.minecraft\.net/.test(url)?"skin_b64":"img_b64",{url}):null;if(!b64&&T)throw 0;const src=T?"data:image/png;base64,"+b64:url;
@@ -424,7 +425,7 @@ function capeSnap(url){if(capeImg[url])return Promise.resolve(capeImg[url]);
   await capeV.loadCape(src);capeV.playerObject.rotation.y=Math.PI-.55;capeV.camera.rotation.x=-.08;capeV.render();
   return capeImg[url]=capeV.canvas.toDataURL("image/png")});}
 function capeCards(){document.querySelectorAll(".hcov[data-cape]:not([data-cd])").forEach(el=>{const u=el.dataset.cape;if(capeBusy[u]===1&&!capeImg[u])return;el.dataset.cd="1";capeBusy[u]=1;
- capeSnap(u).then(d=>{document.querySelectorAll('.hcov[data-cape="'+CSS.escape(u)+'"]').forEach(c=>{if(!c.querySelector(".cape3d")){const i=new Image();i.className="cape3d";i.src=d;c.appendChild(i);const f=c.querySelector("img[data-h]");if(f)f.style.display="none"}})}).catch(()=>{capeBusy[u]=0;el.removeAttribute("data-cd")})})}
+ capeSnap(u).then(d=>{document.querySelectorAll('.hcov[data-cape="'+CSS.escape(u)+'"]').forEach(c=>{if(!c.querySelector(".cape3d")){const i=new Image();i.className="cape3d";i.src=d;c.appendChild(i);const f=c.querySelector("img[data-h]");if(f)f.style.display="none"}})}).catch(()=>{capeBusy[u]=0;capeTry[u]=(capeTry[u]||0)+1;if(capeTry[u]<4)setTimeout(()=>{el.removeAttribute("data-cd");capeCards()},2500*capeTry[u])})})}
 
 /* ---------- nova instância: janela bonita ---------- */
 const LD={fabric:["Fabric","Leve e rápido. Recomendado para o Sleep.","#d9c28a"],quilt:["Quilt","Alternativa ao Fabric.","#b479ff"],forge:["Forge","Mods clássicos.","#e5844d"],neoforge:["NeoForge","O sucessor do Forge.","#f0a052"],vanilla:["Vanilla","Minecraft sem mods.","#6fcf7a"]};
