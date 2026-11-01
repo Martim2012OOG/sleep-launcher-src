@@ -42,5 +42,27 @@ for mc in sorted(versions):
     else:
         print(f"AVISO: sem Fabric API para {mc}")
 
-json.dump({"mods": [{"id": k, "files": v} for k, v in mods.items()]}, open(os.path.join(out, "mods.json"), "w"), indent=2)
+# mods de FPS (Sodium, Lithium...): NAO os alojamos, o launcher descarrega-os da Modrinth (url + sha1 da própria Modrinth).
+# Vão numa lista à parte ("perf") para o launcher poder saltar os que a instância já tem na pasta mods.
+PERF = ["sodium", "lithium", "ferrite-core", "entityculling", "immediatelyfast"]
+perf = {}
+for mc in sorted(versions):
+    q = urllib.parse.urlencode({"game_versions": json.dumps([mc]), "loaders": json.dumps(["fabric"])})
+    for slug in PERF:
+        try:
+            req = urllib.request.Request(f"https://api.modrinth.com/v2/project/{slug}/version?{q}", headers={"User-Agent": "kubo-launcher-ci"})
+            vs = json.load(urllib.request.urlopen(req))
+        except Exception as ex:
+            print("AVISO:", slug, mc, ex)
+            continue
+        if not vs:
+            print(f"AVISO: {slug} sem versão para {mc}")
+            continue
+        v = next((x for x in vs if x["version_type"] == "release"), vs[0])
+        fl = next((x for x in v["files"] if x.get("primary")), v["files"][0])
+        if not fl["url"].startswith("https://cdn.modrinth.com/"):
+            continue
+        perf.setdefault(slug, {})[mc] = {"url": fl["url"], "sha1": fl["hashes"]["sha1"]}
+
+json.dump({"mods": [{"id": k, "files": v} for k, v in mods.items()], "perf": [{"id": k, "files": v} for k, v in perf.items()]}, open(os.path.join(out, "mods.json"), "w"), indent=2)
 print(json.dumps(mods, indent=1))

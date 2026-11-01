@@ -690,6 +690,11 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
             Err(_) => "mods: sem resposta, a usar os que já tens".to_string(),
         };
         mods::purge_visible(&game.join("mods"));
+        // mods de FPS (Sodium, Lithium...) da Modrinth, só os que a instância ainda não tem
+        let fps_on = settings(&app)["fps_boost"].as_bool().unwrap_or(true);
+        if let Ok(Err(x)) = tokio::time::timeout(std::time::Duration::from_secs(40), mods::sync_perf(&url, &mc, &hidden, &game.join("mods"), fps_on)).await {
+            note = format!("{note} · fps: {x}");
+        }
         let list = mods::jar_list(&hidden);
         if !list.is_empty() {
             args.insert(0, format!("-Dfabric.addMods={list}"));
