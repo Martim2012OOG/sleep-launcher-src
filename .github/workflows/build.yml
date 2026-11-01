@@ -13,7 +13,21 @@ permissions:
   contents: write
 
 jobs:
+  prepare:
+    # a release vive no repositório PÚBLICO de downloads: cria-se lá primeiro (etiqueta no commit dele), os builds só juntam ficheiros
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Criar a release no repositório público
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          R=Martim2012OOG/sleep-launcher
+          SHA=$(gh api repos/$R/git/ref/heads/main -q .object.sha)
+          gh api repos/$R/git/ref/tags/${{ github.ref_name }} >/dev/null 2>&1 || gh api repos/$R/git/refs -f ref=refs/tags/${{ github.ref_name }} -f sha=$SHA >/dev/null
+          gh release view ${{ github.ref_name }} --repo $R >/dev/null 2>&1 || gh release create ${{ github.ref_name }} --repo $R --title "Sleep Launcher ${{ github.ref_name }}" --notes "Instala o ficheiro do teu sistema. Quem já tem o launcher recebe esta versão sozinho."
+
   build:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
