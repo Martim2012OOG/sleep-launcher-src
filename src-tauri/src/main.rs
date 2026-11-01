@@ -346,6 +346,12 @@ async fn app_check_update(app: AppHandle) -> Value {
     }
 }
 
+/// Fecha o launcher (usado quando a pessoa recusa uma atualização obrigatória).
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 /// Descarrega, verifica a assinatura, instala e reinicia o launcher.
 #[tauri::command]
 async fn app_install_update(app: AppHandle) -> Result<(), String> {
@@ -1000,6 +1006,7 @@ fn main() {
             set_app_icon,
             app_check_update,
             app_install_update,
+            quit_app,
             media_list,
             media_delete,
             media_reveal,

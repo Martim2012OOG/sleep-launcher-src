@@ -12,6 +12,12 @@ Automático|Automatic|Automático
 Natal|Christmas|Navidad
 FNAF|FNAF|FNAF
 Imagem clássica|Classic image|Imagen clásica
+Esta app tem uma nova versão|This app has a new version|Esta app tiene una versión nueva
+Por favor atualiza a app para continuar a jogar. Queres atualizar agora?|Please update the app to keep playing. Do you want to update now?|Actualiza la app para seguir jugando. ¿Quieres actualizar ahora?
+Não, fechar a app|No, close the app|No, cerrar la app
+Sim, atualizar|Yes, update|Sí, actualizar
+Fechar a app|Close the app|Cerrar la app
+Tentar outra vez|Try again|Intentar de nuevo
 Ícone da app|App icon|Icono de la app
 Muda o ícone do Sleep no Dock e na barra de tarefas. Escolhe um, ou carrega uma imagem tua.|Change the Sleep icon in the Dock and taskbar. Pick one, or upload your own image.|Cambia el icono de Sleep en el Dock y la barra de tareas. Elige uno o sube tu imagen.
 Não foi possível mudar o ícone.|Could not change the icon.|No se pudo cambiar el icono.

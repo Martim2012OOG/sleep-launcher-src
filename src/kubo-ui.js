@@ -595,12 +595,20 @@ document.addEventListener("click",e=>{const el=e.target.closest("[data-a=kmf],[d
  if(a=="kmf"){S.mf=el.dataset.v;render()}else if(a=="kmr"){S.media=null;render()}else{const p=decodeURIComponent(el.dataset.p),m=(S.media||[]).find(x=>x.path==p);if(m)galView(m)}},true);
 
 /* ---------- atualização automática do launcher ---------- */
-function showUpd(v,err){let b=document.getElementById("kupd");if(!b){b=document.createElement("div");b.id="kupd";document.body.appendChild(b)}
- b.innerHTML=err?`<div class="ubox"><b>Não foi possível atualizar. Tenta outra vez mais tarde.</b><div class="row" style="justify-content:flex-end"><button class="btn" data-u="x">Fechar</button></div></div>`
- :`<div class="ubox"><img src="img/mascot.png" alt=""><b>A atualizar o Sleep Launcher</b><span class="tag">Versão ${esc(v||"")} · não feches a janela, abre sozinho quando acabar.</span><div class="ubar"><i id="kubar"></i></div></div>`;
- if(!b.dataset.h){b.dataset.h=1;b.addEventListener("click",e=>{if(e.target.closest("[data-u=x]")){b.remove();S.updBusy=false}})}}
+function updBox(){let b=document.getElementById("kupd");if(!b){b=document.createElement("div");b.id="kupd";document.body.appendChild(b)}
+ if(!b.dataset.h){b.dataset.h=1;b.addEventListener("click",e=>{const u=e.target.closest("[data-u]");if(!u)return;const k=u.dataset.u;
+  if(k=="no"){inv("quit_app").catch(()=>{try{window.close()}catch(x){}})}
+  else if(k=="yes"||k=="retry"){doUpd(S.updVer)}
+  else if(k=="x"){b.remove();S.updBusy=false}})}
+ return b}
+/* há uma versão nova: a app não deixa continuar sem atualizar (Sim atualiza, Não fecha a app) */
+function askUpd(v){S.updVer=v;updBox().innerHTML=`<div class="ubox"><img src="img/mascot.png" alt=""><b>Esta app tem uma nova versão</b><span class="tag">Por favor atualiza a app para continuar a jogar. Queres atualizar agora?</span><span class="tag">v${esc(v||"")}</span><div class="row" style="gap:10px;justify-content:center;margin-top:6px"><button class="btn" data-u="no">Não, fechar a app</button><button class="btn p" data-u="yes">Sim, atualizar</button></div></div>`}
+function showUpd(v,err){const b=updBox();
+ b.innerHTML=err?`<div class="ubox"><b>Não foi possível atualizar. Tenta outra vez mais tarde.</b><div class="row" style="gap:10px;justify-content:center"><button class="btn" data-u="no">Fechar a app</button><button class="btn p" data-u="retry">Tentar outra vez</button></div></div>`
+ :`<div class="ubox"><img src="img/mascot.png" alt=""><b>A atualizar o Sleep Launcher</b><span class="tag">Versão ${esc(v||"")} · não feches a janela, abre sozinho quando acabar.</span><div class="ubar"><i id="kubar"></i></div></div>`}
+async function doUpd(v){try{showUpd(v);await inv("app_install_update")}catch(x){showUpd(null,String(x))}}
 if(T)T.event.listen("progress",ev=>{const p=ev.payload;if(p&&p.stage=="Launcher"){const e=document.getElementById("kubar");if(e)e.style.width=Math.min(100,Math.round(p.done*100/Math.max(1,p.total)))+"%"}});
-async function autoUpd(){if(!T||S.updBusy)return;try{const u=await inv("app_check_update");if(!u||!u.version)return;S.updBusy=true;showUpd(u.version);await inv("app_install_update")}catch(x){showUpd(null,String(x))}}
+async function autoUpd(){if(!T||S.updBusy)return;try{const u=await inv("app_check_update");if(!u||!u.version)return;S.updBusy=true;askUpd(u.version)}catch(x){}}
 if(T){setTimeout(autoUpd,1500);setInterval(autoUpd,30*60*1000)}
 /* ecrã maximizado fica igual ao normal: a página é ampliada em proporção ao tamanho da janela */
 async function fitZoom(){try{const A=window.__TAURI__;if(!A||!A.window||!A.webview)return;const w=A.window.getCurrentWindow(),[sz,sf]=await Promise.all([w.innerSize(),w.scaleFactor()]);
