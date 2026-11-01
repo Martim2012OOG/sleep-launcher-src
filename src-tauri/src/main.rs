@@ -816,11 +816,25 @@ fn open_folder(app: AppHandle, name: String) -> Result<(), String> {
 
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
-    let ok = ["https://modrinth.com/", "https://www.curseforge.com/", "https://www.minecraft.net/", "https://minecraft.net/", "https://feedback.minecraft.net/", "https://pal-connect-plaza.lovable.app/", "https://www.microsoft.com/link", "https://microsoft.com/link", "https://login.live.com/", "https://aka.ms/"];
+    let ok = ["https://modrinth.com/", "https://www.curseforge.com/", "https://www.minecraft.net/", "https://minecraft.net/", "https://feedback.minecraft.net/", "https://pal-connect-plaza.lovable.app/", "https://www.microsoft.com/link", "https://microsoft.com/link", "https://login.live.com/", "https://aka.ms/", "https://mcpelauncher.readthedocs.io/", "https://minecraft-linux.github.io/", "https://apps.microsoft.com/", "https://www.microsoft.com/store/"];
     if !ok.iter().any(|p| url.starts_with(p)) {
         return Err("endereço não permitido".into());
     }
     open_path(&url)
+}
+
+/// Abre o Minecraft Bedrock já instalado (só Windows: o Bedrock é da Microsoft Store). Nos outros sistemas devolve erro e a interface mostra o guia.
+#[tauri::command]
+fn bedrock_launch() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("cmd").args(["/C", "start", "", "minecraft:"]).creation_flags(0x08000000).spawn().map(|_| ()).map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        Err("só no Windows".into())
+    }
 }
 
 // ---------- separadores da instância (passo 9B) ----------
@@ -1007,6 +1021,7 @@ fn main() {
             app_check_update,
             app_install_update,
             quit_app,
+            bedrock_launch,
             media_list,
             media_delete,
             media_reveal,

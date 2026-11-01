@@ -18,6 +18,13 @@ Não, fechar a app|No, close the app|No, cerrar la app
 Sim, atualizar|Yes, update|Sí, actualizar
 Fechar a app|Close the app|Cerrar la app
 Tentar outra vez|Try again|Intentar de nuevo
+Minecraft Bedrock|Minecraft Bedrock|Minecraft Bedrock
+Abre o Bedrock instalado|Opens the Bedrock you installed|Abre el Bedrock instalado
+Como jogar Bedrock aqui|How to play Bedrock here|Cómo jugar Bedrock aquí
+Ver como|See how|Ver cómo
+Abrir|Open|Abrir
+Não consegui abrir o Bedrock. Instala-o pela Microsoft Store.|Could not open Bedrock. Install it from the Microsoft Store.|No pude abrir Bedrock. Instálalo desde la Microsoft Store.
+O Bedrock tem de estar comprado no Google Play. O mcpelauncher instala-o e abre-o.|Bedrock must be bought on Google Play. mcpelauncher installs and opens it.|Bedrock debe estar comprado en Google Play. mcpelauncher lo instala y lo abre.
 Ícone da app|App icon|Icono de la app
 Muda o ícone do Sleep no Dock e na barra de tarefas. Escolhe um, ou carrega uma imagem tua.|Change the Sleep icon in the Dock and taskbar. Pick one, or upload your own image.|Cambia el icono de Sleep en el Dock y la barra de tareas. Elige uno o sube tu imagen.
 Não foi possível mudar o ícone.|Could not change the icon.|No se pudo cambiar el icono.
