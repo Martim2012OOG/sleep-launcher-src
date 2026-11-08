@@ -1,6 +1,6 @@
 name: Release Sleep Launcher
 
-# Para lançar uma versão: muda "version" em src-tauri/tauri.conf.json e src-tauri/Cargo.toml, faz commit e
+# Para lançr uma versão: muda "version" em src-tauri/tauri.conf.json e src-tauri/Cargo.toml, faz commit e
 #   git tag v0.2.0 && git push --tags
 # No Windows só sai o instalador .exe (NSIS): com .msi e .exe ao mesmo tempo havia duas instalações em pastas diferentes e o atalho ficava na antiga.
 # Compila Windows, macOS (Apple Silicon + Intel) e Linux, assina as atualizações (updater) e publica tudo na Release,
