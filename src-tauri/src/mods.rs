@@ -10,6 +10,19 @@ fn hex(b: &[u8]) -> String {
     format!("{:x}", Sha1::digest(b))
 }
 
+/// Escreve para o lado e troca: nunca fica um jar a meio.
+fn write_atomic(target: &Path, b: &[u8]) -> Result<(), String> {
+    let tmp = target.with_extension("part");
+    std::fs::write(&tmp, b).map_err(e)?;
+    std::fs::rename(&tmp, target).map_err(e)
+}
+
+/// As mods desta versão foram verificadas há menos de 6 horas e estão no disco? Então Jogar não precisa de ir à rede.
+pub fn is_fresh(mods: &Path) -> bool {
+    let recent = std::fs::metadata(mods.join(".synced")).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|d| d.as_secs() < 6 * 3600);
+    recent && !jar_list(mods).is_empty()
+}
+
 /// Lê o manifesto remoto e deixa na pasta mods o jar certo para a versão `mc` (com SHA1).
 /// Formato: {"mods":[{"id":"kubo","files":{"1.21.11":{"url":"...","sha1":"..."}}}]}
 pub async fn sync(url: &str, mc: &str, mods: &Path) -> Result<String, String> {
@@ -35,7 +48,7 @@ pub async fn sync(url: &str, mc: &str, mods: &Path) -> Result<String, String> {
             if !hex(&b).eq_ignore_ascii_case(h) {
                 return Err(format!("SHA1 errado no mod {id}"));
             }
-            std::fs::write(&target, &b).map_err(e)?;
+            write_atomic(&target, &b)?;
             n += 1;
         }
         // apaga jars antigos do mesmo mod ("id-<só números e pontos>.jar") de outras versões do jogo
@@ -52,6 +65,7 @@ pub async fn sync(url: &str, mc: &str, mods: &Path) -> Result<String, String> {
             }
         }
     }
+    let _ = std::fs::write(mods.join(".synced"), b"");
     Ok(format!("{n} mod(s) atualizado(s)"))
 }
 
@@ -106,7 +120,7 @@ pub async fn sync_perf(url: &str, mc: &str, hidden: &Path, visible: &Path, enabl
             if !hex(&b).eq_ignore_ascii_case(h) {
                 return Err(format!("SHA1 errado em {id}"));
             }
-            std::fs::write(&target, &b).map_err(e)?;
+            write_atomic(&target, &b)?;
             n += 1;
         }
     }

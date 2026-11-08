@@ -14,6 +14,7 @@ mod loaders;
 mod mods;
 mod modrinth;
 mod mojang;
+mod perf;
 mod social;
 
 use serde_json::{json, Value};
@@ -72,13 +73,18 @@ fn settings(app: &AppHandle) -> Value {
         .unwrap_or_else(|| json!({"manifest_url": ""}))
 }
 
-/// Guarda uma chave em settings.json sem apagar as outras.
+static SETTINGS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Guarda uma chave em settings.json sem apagar as outras. Escreve para um ficheiro temporário e troca: se a app fechar a meio, o ficheiro antigo fica inteiro.
 fn patch(app: &AppHandle, k: &str, v: Value) -> Result<(), String> {
+    let _g = SETTINGS_LOCK.lock().unwrap_or_else(|x| x.into_inner());
     let mut s = settings(app);
     s[k] = v;
     let r = root(app)?;
     std::fs::create_dir_all(&r).map_err(err)?;
-    std::fs::write(r.join("settings.json"), s.to_string()).map_err(err)
+    let tmp = r.join(format!("settings.json.{}.tmp", std::process::id()));
+    std::fs::write(&tmp, s.to_string()).map_err(err)?;
+    std::fs::rename(&tmp, r.join("settings.json")).map_err(err)
 }
 
 #[tauri::command]
@@ -99,40 +105,54 @@ fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool, String> {
     Ok(a.is_enabled().unwrap_or(enabled))
 }
 
+/// Preferências que a interface pode ler e mudar. Chaves e outros valores internos nunca passam por aqui.
+const PREFS: [&str; 9] = ["lang", "close_to_tray", "hide_on_play", "fps_mode", "intro", "reduce_motion", "ui_scale", "default_ram", "perf_new"];
+
 #[tauri::command]
 fn get_settings(app: AppHandle) -> Value {
-    let mut s = settings(&app);
-    if s["client_id"].as_str().unwrap_or("").is_empty() {
-        s["client_id"] = json!(DEFAULT_CID);
+    let s = settings(&app);
+    let cur = app.package_info().version.to_string();
+    let mut o = json!({"has_cf_key": !cfkey(&app).is_empty(), "theme": s["theme"], "last": s["last"], "version": cur, "total_ram": perf::total_ram_mb()});
+    for k in PREFS {
+        if !s[k].is_null() {
+            o[k] = s[k].clone();
+        }
     }
-    // a chave da CurseForge nunca vai para a interface
-    let has = !s["cf_key"].as_str().unwrap_or("").trim().is_empty() || option_env!("KUBO_CF_KEY").map(|k| !k.is_empty()).unwrap_or(false);
-    if let Some(o) = s.as_object_mut() {
-        o.remove("cf_key");
+    // uma atualização que dizia ter instalado mas a app continua na versão antiga
+    if let Some(to) = s["update_pending"]["to"].as_str() {
+        if to != cur && s["update_pending"]["from"].as_str() == Some(cur.as_str()) {
+            o["update_failed"] = json!(to);
+        } else {
+            let _ = patch(&app, "update_pending", Value::Null);
+        }
     }
-    s["has_cf_key"] = json!(has);
-    // a chave do backend de amigos também nunca vai para a interface
-    let hs = !s["social_key"].as_str().unwrap_or("").trim().is_empty();
-    if let Some(o) = s.as_object_mut() {
-        o.remove("social_key");
-    }
-    s["has_social_key"] = json!(hs);
-    s
-}
-
-/// Chave da CurseForge: a que a pessoa guardou, ou a do próprio launcher (posta ao compilar com KUBO_CF_KEY=... para toda a gente poder pesquisar sem configurar nada).
-fn cfkey(app: &AppHandle) -> String {
-    let own = settings(app)["cf_key"].as_str().unwrap_or("").trim().to_string();
-    if own.is_empty() {
-        option_env!("KUBO_CF_KEY").unwrap_or("").to_string()
-    } else {
-        own
-    }
+    o
 }
 
 #[tauri::command]
-fn save_cf_key(app: AppHandle, key: String) -> Result<(), String> {
-    patch(&app, "cf_key", json!(key.trim()))
+fn save_pref(app: AppHandle, key: String, value: Value) -> Result<(), String> {
+    let ok = match key.as_str() {
+        "lang" => value.as_str().is_some_and(|l| ["en", "pt", "es"].contains(&l)),
+        "close_to_tray" | "hide_on_play" | "fps_mode" | "intro" | "reduce_motion" | "perf_new" => value.is_boolean(),
+        "ui_scale" => value.as_f64().is_some_and(|f| (0.8..=1.5).contains(&f)),
+        "default_ram" => value.as_u64().is_some_and(|m| m == 0 || (1024..=65536).contains(&m)),
+        _ => false,
+    };
+    if !ok {
+        return Err("definição inválida".into());
+    }
+    patch(&app, &key, value)
+}
+
+include!(concat!(env!("OUT_DIR"), "/cf_key.rs"));
+
+/// Chave da CurseForge: a que vem no próprio launcher; sem essa (compilações locais), a que já estivesse guardada neste computador.
+fn cfkey(app: &AppHandle) -> String {
+    let built: String = CF_A.iter().zip(CF_B.iter()).map(|(a, b)| (a ^ b) as char).collect();
+    if !built.is_empty() {
+        return built;
+    }
+    settings(app)["cf_key"].as_str().unwrap_or("").trim().to_string()
 }
 
 #[tauri::command]
@@ -154,7 +174,7 @@ async fn cf_install(app: AppHandle, name: String, kind: String, project: String)
     curseforge::install(&cfkey(&app), &dir.join("game"), &kind, &project, &mc, &loader).await
 }
 
-// Application (client) ID da app registada no Azure. Pode ser mudado em Definições.
+// Client ID público da app no Azure: só serve para renovar sessões antigas (o login novo usa o client da Microsoft em auth.rs).
 const DEFAULT_CID: &str = "b28c431e-5e0b-4f84-af8b-d5b4e15453e3";
 
 fn cid(app: &AppHandle) -> String {
@@ -162,15 +182,19 @@ fn cid(app: &AppHandle) -> String {
 }
 
 #[tauri::command]
-fn save_client_id(app: AppHandle, client_id: String) -> Result<(), String> {
-    patch(&app, "client_id", json!(client_id.trim()))
-}
-
-#[tauri::command]
 async fn ms_login(app: AppHandle) -> Result<Value, String> {
     // só a janela normal da Microsoft (sem códigos); funciona igual no Windows, Mac e Linux
     auth::login_web(&app).await.map(|a| auth::public(&a))
+}
 
+/// Fecha a janela de login se a pessoa carregar em Cancelar no launcher.
+#[tauri::command]
+fn ms_login_cancel(app: AppHandle) {
+    for (l, w) in app.webview_windows() {
+        if l.starts_with("login") {
+            let _ = w.destroy();
+        }
+    }
 }
 
 /// Só deixa pedir o JSON das novidades do Minecraft (a interface não pode pedir outros endereços).
@@ -353,22 +377,86 @@ fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// macOS: a pasta .app em que estamos a correr.
+#[cfg(target_os = "macos")]
+fn app_bundle() -> Option<PathBuf> {
+    std::env::current_exe().ok()?.ancestors().find(|p| p.extension().is_some_and(|x| x == "app")).map(PathBuf::from)
+}
+
+/// macOS: a correr dentro do .dmg ou numa cópia temporária de leitura (o macOS faz isto às apps que não foram para Aplicações): não dá para atualizar aí.
+#[tauri::command]
+fn app_update_blocked() -> bool {
+    #[cfg(target_os = "macos")]
+    if let Some(b) = app_bundle() {
+        let p = b.to_string_lossy();
+        return p.contains("/AppTranslocation/") || p.starts_with("/Volumes/");
+    }
+    false
+}
+
 /// Descarrega, verifica a assinatura, instala e reinicia o launcher.
 #[tauri::command]
 async fn app_install_update(app: AppHandle) -> Result<(), String> {
+    if app_update_blocked() {
+        return Err("UPD_MOVE".into());
+    }
     let up = updater(&app)?.check().await.map_err(|e| e.to_string())?.ok_or("Já tens a versão mais recente")?;
+    // fica registado antes de instalar (no Windows o instalador fecha a app): ao reabrir sabemos se a versão mudou mesmo
+    patch(&app, "update_pending", json!({"from": app.package_info().version.to_string(), "to": up.version}))?;
     let a2 = app.clone();
     let mut got = 0u64;
-    up.download_and_install(
-        move |chunk, total| {
-            got += chunk as u64;
-            let _ = a2.emit("progress", json!({"stage": "Launcher", "done": got, "total": total.unwrap_or(got.max(1))}));
-        },
-        || {},
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    if let Err(x) = up
+        .download_and_install(
+            move |chunk, total| {
+                got += chunk as u64;
+                let _ = a2.emit("progress", json!({"stage": "Launcher", "done": got, "total": total.unwrap_or(got.max(1))}));
+            },
+            || {},
+        )
+        .await
+    {
+        let _ = patch(&app, "update_pending", Value::Null);
+        return Err(x.to_string());
+    }
+    // macOS: reabre pelo sistema depois de este processo sair, sem herdar o --hidden do arranque automático
+    #[cfg(target_os = "macos")]
+    if let Some(b) = app_bundle() {
+        let spawned = std::process::Command::new("/bin/sh").arg("-c").arg("sleep 1; /usr/bin/open \"$0\"").arg(&b).spawn();
+        if spawned.is_ok() {
+            app.exit(0);
+            return Ok(());
+        }
+    }
     app.restart()
+}
+
+// ---------- pasta de dados ----------
+
+fn dir_size(p: &Path) -> u64 {
+    std::fs::read_dir(p).map(|r| r.flatten().map(|e| if e.path().is_dir() { dir_size(&e.path()) } else { e.metadata().map(|m| m.len()).unwrap_or(0) }).sum()).unwrap_or(0)
+}
+
+#[tauri::command]
+fn open_data_dir(app: AppHandle) -> Result<(), String> {
+    let r = root(&app)?;
+    std::fs::create_dir_all(&r).map_err(err)?;
+    open_path(&r.to_string_lossy())
+}
+
+/// Tamanho da cache que dá para apagar sem perder nada (fundos das instâncias e ficheiros temporários).
+#[tauri::command]
+fn cache_size(app: AppHandle) -> Result<u64, String> {
+    let r = root(&app)?;
+    Ok(dir_size(&r.join("panoramas")) + dir_size(&r.join("tmp")))
+}
+
+#[tauri::command]
+fn clear_cache(app: AppHandle) -> Result<(), String> {
+    let r = root(&app)?;
+    for d in ["panoramas", "tmp"] {
+        let _ = std::fs::remove_dir_all(r.join(d));
+    }
+    Ok(())
 }
 
 // ---------- galeria: capturas de ecrã e gravações/clips do jogo ----------
@@ -482,11 +570,6 @@ fn skey(app: &AppHandle) -> String {
 }
 
 #[tauri::command]
-fn save_social_key(app: AppHandle, key: String) -> Result<(), String> {
-    patch(&app, "social_key", json!(key.trim()))
-}
-
-#[tauri::command]
 async fn social_login(app: AppHandle) -> Result<Value, String> {
     let c = cid(&app);
     social::login(&app, &skey(&app), &c).await
@@ -520,11 +603,6 @@ async fn set_cape(app: AppHandle, cape_id: Option<String>) -> Result<Value, Stri
 }
 
 #[tauri::command]
-fn save_settings(app: AppHandle, manifest_url: String) -> Result<(), String> {
-    patch(&app, "manifest_url", json!(manifest_url.trim()))
-}
-
-#[tauri::command]
 async fn list_versions() -> Result<Vec<Value>, String> {
     mojang::versions().await
 }
@@ -553,19 +631,23 @@ fn norm_loader(l: &str) -> &'static str {
     }
 }
 
-#[tauri::command]
-async fn create_instance(app: AppHandle, name: String, version: String, loader: String) -> Result<(), String> {
-    let dir = idir(&app, &name)?;
+async fn make_instance(app: &AppHandle, name: &str, version: &str, loader: &str, loader_version: Option<&str>) -> Result<(), String> {
+    let dir = idir(app, name)?;
     let all = mojang::versions().await?;
     let url = all
         .iter()
-        .find(|x| x["id"].as_str() == Some(version.as_str()))
+        .find(|x| x["id"].as_str() == Some(version))
         .and_then(|x| x["url"].as_str())
         .ok_or("versão não encontrada")?
         .to_string();
-    let loader = norm_loader(&loader);
+    let loader = norm_loader(loader);
     std::fs::create_dir_all(dir.join("game")).map_err(err)?;
-    write_inst(&dir, &json!({"name": clean(&name), "version": version, "url": url, "loader": loader, "installed": false}))
+    write_inst(&dir, &json!({"name": clean(name), "version": version, "url": url, "loader": loader, "loader_version": loader_version, "installed": false}))
+}
+
+#[tauri::command]
+async fn create_instance(app: AppHandle, name: String, version: String, loader: String) -> Result<(), String> {
+    make_instance(&app, &name, &version, &loader, None).await
 }
 
 #[tauri::command]
@@ -577,13 +659,15 @@ async fn install_instance(app: AppHandle, name: String) -> Result<(), String> {
     let url = inst["url"].as_str().unwrap_or("").to_string();
     let loader = norm_loader(inst["loader"].as_str().unwrap_or("vanilla"));
     let parent = mojang::vanilla_json(&shared, &mc, &url).await?;
+    // os modpacks fixam a versão do loader; as instâncias normais usam a mais recente
+    let lv = inst["loader_version"].as_str().map(String::from);
     let (pid, vj) = match loader {
-        "fabric" | "quilt" => fabric::profile(&mc, &parent, loader == "quilt").await?,
+        "fabric" | "quilt" => fabric::profile(&mc, &parent, loader == "quilt", lv.as_deref()).await?,
         "forge" | "neoforge" => {
             // o instalador precisa do cliente vanilla já descarregado
             mojang::install(&app, &shared, &mc, &parent).await?;
             let major = parent["javaVersion"]["majorVersion"].as_u64().unwrap_or(8);
-            let (id, child) = loaders::install(&app, &root(&app)?, &shared, &mc, loader == "neoforge", major).await?;
+            let (id, child) = loaders::install(&app, &root(&app)?, &shared, &mc, loader == "neoforge", major, lv.as_deref()).await?;
             (id, fabric::merge(&parent, &child, &mc))
         }
         _ => (mc.clone(), parent),
@@ -599,15 +683,23 @@ async fn install_instance(app: AppHandle, name: String) -> Result<(), String> {
     write_inst(&dir, &inst)
 }
 
+/// Instala um modpack da Modrinth (source "mr") ou da CurseForge ("cf") numa instância nova. Devolve {name, blocked}: `blocked` são os ficheiros que o autor só deixa descarregar no site.
 #[tauri::command]
-async fn install_modpack(app: AppHandle, project: String, title: String) -> Result<String, String> {
-    let (index, bytes) = modrinth::fetch_pack(&project).await?;
-    let deps = index["dependencies"].as_object().cloned().unwrap_or_default();
-    if deps.contains_key("forge") || deps.contains_key("neoforge") || deps.contains_key("quilt-loader") {
-        return Err("este modpack usa Forge, NeoForge ou Quilt (os modpacks ainda só são suportados em Fabric)".into());
-    }
-    let mc = deps.get("minecraft").and_then(|x| x.as_str()).ok_or("modpack sem versão do Minecraft")?.to_string();
-    let loader = if deps.contains_key("fabric-loader") { "fabric" } else { "vanilla" };
+async fn install_modpack(app: AppHandle, source: Option<String>, project: String, title: String, mc: Option<String>, loader: Option<String>) -> Result<Value, String> {
+    let cf = source.as_deref() == Some("cf");
+    let (want_mc, want_ld) = (mc.unwrap_or_default(), loader.unwrap_or_default());
+    let key = cfkey(&app);
+    let (index, bytes, version, ld, lv) = if cf {
+        let (m, b) = curseforge::fetch_pack(&key, project.trim_start_matches("cf:"), &want_mc, &want_ld).await?;
+        let v = m["minecraft"]["version"].as_str().ok_or("modpack sem versão do Minecraft")?.to_string();
+        let (l, lv) = curseforge::pack_loader(&m);
+        (m, b, v, l, lv)
+    } else {
+        let (m, b) = modrinth::fetch_pack(&project, &want_mc, &want_ld).await?;
+        let v = m["dependencies"]["minecraft"].as_str().ok_or("modpack sem versão do Minecraft")?.to_string();
+        let (l, lv) = modrinth::pack_loader(&m);
+        (m, b, v, l, lv)
+    };
     let base = clean(&title);
     let base = if base.is_empty() { "Modpack".to_string() } else { base };
     let mut name = base.clone();
@@ -616,10 +708,17 @@ async fn install_modpack(app: AppHandle, project: String, title: String) -> Resu
         name = format!("{base} {n}");
         n += 1;
     }
-    create_instance(app.clone(), name.clone(), mc, loader.to_string()).await?;
+    make_instance(&app, &name, &version, ld, lv.as_deref()).await?;
     let game = idir(&app, &name)?.join("game");
-    modrinth::apply_pack(&app, &game, &index, &bytes).await?;
-    Ok(name)
+    let res = if cf { curseforge::apply_pack(&app, &key, &game, &index, &bytes).await } else { modrinth::apply_pack(&app, &game, &index, &bytes).await.map(|_| vec![]) };
+    match res {
+        Ok(blocked) => Ok(json!({"name": name, "blocked": blocked})),
+        Err(x) => {
+            // não deixa uma instância a meio
+            let _ = std::fs::remove_dir_all(idir(&app, &name)?);
+            Err(x)
+        }
+    }
 }
 
 #[tauri::command]
@@ -664,10 +763,17 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
     let (user, uuid, tk) = auth::session(&app, &c).await.unwrap_or_else(|| {
         ("Sleep".to_string(), "00000000-0000-0000-0000-000000000000".to_string(), "0".to_string())
     });
+    let prefs = settings(&app);
+    let total = perf::total_ram_mb();
+    let ram_max = Some(inst["ram_max"].as_u64().unwrap_or(0)).filter(|m| *m > 0).or(prefs["default_ram"].as_u64().filter(|m| *m > 0)).unwrap_or_else(|| perf::auto_ram(total));
+    // com memória de sobra a pilha nasce logo com o tamanho final (o Java não perde tempo a aumentá-la a meio do jogo)
+    let ram_min = Some(inst["ram_min"].as_u64().unwrap_or(0)).filter(|m| *m > 0).unwrap_or(if total >= 12288 { ram_max } else { 0 });
+    perf::apply_fps_mode(&game, prefs["fps_mode"].as_bool().unwrap_or(false));
     let opts = launch::Opts {
-        ram_min: inst["ram_min"].as_u64().unwrap_or(0),
-        ram_max: inst["ram_max"].as_u64().unwrap_or(0),
+        ram_min,
+        ram_max,
         jvm: inst["jvm_args"].as_str().unwrap_or("").split_whitespace().map(String::from).collect(),
+        cds_dir: shared.join("cds"),
     };
     let (mut args, major) = launch::build(&shared, &game, &id, &user, &uuid, &tk, &opts)?;
     let (w, h) = (inst["width"].as_u64().unwrap_or(0), inst["height"].as_u64().unwrap_or(0));
@@ -689,19 +795,12 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
     let mut note = String::new();
     if matches!(inst["loader"].as_str(), Some("fabric") | Some("quilt")) {
         // a mod do Sleep é uma mod Fabric (o Quilt também a carrega)
-        let url = settings(&app)["manifest_url"].as_str().filter(|s| !s.trim().is_empty()).map(String::from).unwrap_or_else(default_manifest);
         // fica escondida na pasta de dados do launcher (nunca em game/mods) e o Fabric Loader vai buscá-la por -Dfabric.addMods
         let hidden = root(&app)?.join("kubo-mods").join(&mc);
-        note = match tokio::time::timeout(std::time::Duration::from_secs(45), mods::sync(&url, &mc, &hidden)).await {
-            Ok(r) => r.unwrap_or_else(|x| format!("mods: {x}")),
-            Err(_) => "mods: sem resposta, a usar os que já tens".to_string(),
-        };
-        mods::purge_visible(&game.join("mods"));
-        // mods de FPS (Sodium, Lithium...) da Modrinth, só os que a instância ainda não tem
-        let fps_on = settings(&app)["fps_boost"].as_bool().unwrap_or(false);
-        if let Ok(Err(x)) = tokio::time::timeout(std::time::Duration::from_secs(40), mods::sync_perf(&url, &mc, &hidden, &game.join("mods"), fps_on)).await {
-            note = format!("{note} · fps: {x}");
+        if !mods::is_fresh(&hidden) {
+            note = sync_mods(&app, &mc, &hidden, &game, !mods::jar_list(&hidden).is_empty()).await;
         }
+        mods::purge_visible(&game.join("mods"));
         let list = mods::jar_list(&hidden);
         if !list.is_empty() {
             args.insert(0, format!("-Dfabric.addMods={list}"));
@@ -713,11 +812,70 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        c.creation_flags(0x08000000);
+        // sem consola e com prioridade acima do normal
+        c.creation_flags(0x08000000 | 0x00008000);
     }
     console::start(&app, &clean(&name), c)?;
     let _ = patch(&app, "last", inst["name"].clone());
-    Ok(format!("A iniciar {id}… {note}"))
+    if prefs["hide_on_play"].as_bool().unwrap_or(true) && inst["open_console"].as_bool() != Some(true) {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.hide();
+        }
+    }
+    Ok(format!("A iniciar {id}… {note}").trim().to_string())
+}
+
+fn manifest_url() -> String {
+    default_manifest()
+}
+
+/// Atualiza as mods escondidas. Com mods já no disco nunca faz esperar mais do que uns segundos: joga-se com as que há e o resto fica para a próxima.
+async fn sync_mods(app: &AppHandle, mc: &str, hidden: &Path, game: &Path, have: bool) -> String {
+    let url = manifest_url();
+    let d = std::time::Duration::from_secs(if have { 5 } else { 45 });
+    let mut note = match tokio::time::timeout(d, mods::sync(&url, mc, hidden)).await {
+        Ok(Ok(_)) => String::new(),
+        Ok(Err(x)) if !have => format!("mods: {x}"),
+        Err(_) if !have => "mods: sem resposta".to_string(),
+        _ => String::new(),
+    };
+    let fps_on = settings(app)["fps_boost"].as_bool().unwrap_or(false);
+    if let Ok(Err(x)) = tokio::time::timeout(d, mods::sync_perf(&url, mc, hidden, &game.join("mods"), fps_on)).await {
+        if !have {
+            note = format!("{note} · fps: {x}");
+        }
+    }
+    note
+}
+
+/// Ao abrir o launcher, deixa as mods da última instância em dia em segundo plano: assim carregar em Jogar não precisa de esperar pela rede.
+#[tauri::command]
+async fn prefetch_mods(app: AppHandle) -> Result<(), String> {
+    if !console::running().is_empty() {
+        return Ok(());
+    }
+    let last = settings(&app)["last"].as_str().unwrap_or("").to_string();
+    if last.is_empty() {
+        return Ok(());
+    }
+    let dir = idir(&app, &last)?;
+    let inst = read_inst(&dir)?;
+    if !matches!(inst["loader"].as_str(), Some("fabric") | Some("quilt")) {
+        return Ok(());
+    }
+    let mc = inst["version"].as_str().unwrap_or("").to_string();
+    let hidden = root(&app)?.join("kubo-mods").join(&mc);
+    if !mods::is_fresh(&hidden) {
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(120), mods::sync(&manifest_url(), &mc, &hidden)).await;
+    }
+    Ok(())
+}
+
+/// O jogo fechou: volta a mostrar o launcher se foi ele que se escondeu.
+pub fn after_game(app: &AppHandle) {
+    if settings(app)["hide_on_play"].as_bool().unwrap_or(true) && console::running().is_empty() {
+        show(app);
+    }
 }
 
 /// Servidor a que o jogo se ligou por último (lido da consola), para convidar amigos (passo 10).
@@ -817,8 +975,8 @@ fn open_folder(app: AppHandle, name: String) -> Result<(), String> {
 
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
-    let ok = ["https://modrinth.com/", "https://www.curseforge.com/", "https://www.minecraft.net/", "https://minecraft.net/", "https://feedback.minecraft.net/", "https://pal-connect-plaza.lovable.app/", "https://www.microsoft.com/link", "https://microsoft.com/link", "https://login.live.com/", "https://aka.ms/", "https://mcpelauncher.readthedocs.io/", "https://minecraft-linux.github.io/", "https://apps.microsoft.com/", "https://www.microsoft.com/store/"];
-    if !ok.iter().any(|p| url.starts_with(p)) {
+    let ok = ["https://modrinth.com/", "https://www.curseforge.com/", "https://www.minecraft.net/", "https://minecraft.net/", "https://feedback.minecraft.net/", "https://pal-connect-plaza.lovable.app/", "https://www.microsoft.com/link", "https://microsoft.com/link", "https://login.live.com/", "https://aka.ms/", "https://mcpelauncher.readthedocs.io/", "https://minecraft-linux.github.io/", "https://apps.microsoft.com/", "https://www.microsoft.com/store/", "https://www.xbox.com/", "https://account.xbox.com/", "https://account.microsoft.com/", "https://support.xbox.com/"];
+    if !ok.iter().any(|p| url.starts_with(p)) && !url.starts_with(&format!("https://github.com/{REPO}/releases")) {
         return Err("endereço não permitido".into());
     }
     open_path(&url)
@@ -954,6 +1112,8 @@ fn show(app: &AppHandle) {
 
 fn main() {
     tauri::Builder::default()
+        // tem de ser o primeiro plugin: abrir a app outra vez mostra a que já está a correr em vez de criar uma segunda
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| show(app)))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .setup(|app| {
@@ -1000,17 +1160,22 @@ fn main() {
             Ok(())
         })
         .on_window_event(|w, ev| {
-            if let WindowEvent::CloseRequested { api, .. } = ev {
-                let _ = w.hide();
-                api.prevent_close();
+            // só a janela principal fica na bandeja: a janela de login tem mesmo de fechar
+            if let (WindowEvent::CloseRequested { api, .. }, "main") = (ev, w.label()) {
+                if settings(w.app_handle())["close_to_tray"].as_bool().unwrap_or(true) {
+                    let _ = w.hide();
+                    api.prevent_close();
+                } else {
+                    w.app_handle().exit(0);
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
             get_settings,
-            save_settings,
+            save_pref,
             set_theme,
-            save_client_id,
             ms_login,
+            ms_login_cancel,
             ms_logout,
             get_account,
             offline_login,
@@ -1025,6 +1190,11 @@ fn main() {
             set_app_icon,
             app_check_update,
             app_install_update,
+            app_update_blocked,
+            open_data_dir,
+            cache_size,
+            clear_cache,
+            prefetch_mods,
             quit_app,
             bedrock_launch,
             bedrock_state,
@@ -1056,13 +1226,11 @@ fn main() {
             delete_instance,
             open_folder,
             open_url,
-            save_cf_key,
             cf_categories,
             cf_search,
             cf_install,
             install_modpack,
             check_updates,
-            save_social_key,
             social_login,
             social_req,
             social_logout,
@@ -1082,6 +1250,13 @@ fn main() {
             clear_console,
             running_games
         ])
-        .run(tauri::generate_context!())
-        .expect("erro ao iniciar o Sleep Launcher");
+        .build(tauri::generate_context!())
+        .expect("erro ao iniciar o Sleep Launcher")
+        .run(|_app, _ev| {
+            // macOS: clicar no ícone do Dock com a janela escondida volta a mostrá-la
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = _ev {
+                show(_app);
+            }
+        });
 }

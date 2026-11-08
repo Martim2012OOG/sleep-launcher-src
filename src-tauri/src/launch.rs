@@ -23,6 +23,8 @@ pub struct Opts {
     pub ram_min: u64,
     pub ram_max: u64,
     pub jvm: Vec<String>,
+    /// Pasta da cache de classes do Java (arranques seguintes mais rápidos).
+    pub cds_dir: std::path::PathBuf,
 }
 
 /// Devolve (argumentos, versão de Java necessária).
@@ -72,6 +74,7 @@ pub fn build(root: &Path, game: &Path, id: &str, user: &str, uuid: &str, token: 
         vj["minecraftArguments"].as_str().unwrap_or("").split_whitespace().map(String::from).collect()
     };
     let max = if o.ram_max > 0 { o.ram_max } else { 4096 };
+    let major = vj["javaVersion"]["majorVersion"].as_u64().unwrap_or(8);
     let mut args = vec![];
     if o.ram_min > 0 {
         args.push(format!("-Xms{}M", o.ram_min.min(max)));
@@ -83,11 +86,15 @@ pub fn build(root: &Path, game: &Path, id: &str, user: &str, uuid: &str, token: 
             args.push(f.to_string());
         }
     }
+    // o Java 19+ guarda as classes já carregadas e reutiliza-as no arranque seguinte
+    if o.jvm.is_empty() && major >= 19 && std::fs::create_dir_all(&o.cds_dir).is_ok() {
+        args.push("-XX:+AutoCreateSharedArchive".to_string());
+        args.push(format!("-XX:SharedArchiveFile={}", o.cds_dir.join(format!("{id}-{major}.jsa")).display()));
+    }
     args.extend(o.jvm.iter().cloned());
     args.extend(jvm.iter().map(|s| sub(s)));
     args.push(vj["mainClass"].as_str().ok_or("versão sem mainClass")?.to_string());
     args.extend(gm.iter().map(|s| sub(s)));
 
-    let major = vj["javaVersion"]["majorVersion"].as_u64().unwrap_or(8);
     Ok((args, major))
 }

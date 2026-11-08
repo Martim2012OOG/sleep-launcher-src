@@ -47,11 +47,12 @@ function vGate(){return`<div class="gate"><img class="gbg" src="img/bg.jpg" alt=
 <div class="gbtns"><button class="btn big" data-a="kms">${msIcon}Entrar com Microsoft</button><button class="btn p big" data-a="kcr">${I.user}Entrar com conta cracked</button>
 <div class="grow"><button class="btn" data-a="kbug">${I.ext}Reportar bugs</button></div><span class="gnote">Conta cracked só funciona em servidores em modo offline. É preciso entrar com uma das duas para jogar.</span></div></div>
 <div class="gartw"><img class="gart" src="img/duo.png" alt=""></div></div><button class="btn grev" data-a="krev">${I.chat}Reviews</button><button class="btn glang" data-a="klang" data-notr>${(KL.langs.find(l=>l[0]==KL.get())||KL.langs[0])[2]} ${(KL.langs.find(l=>l[0]==KL.get())||KL.langs[0])[1]} ▾</button></div>`}
-function kmodal(){if(S.km=="cr")return`<div class="ov" style="z-index:12"><div class="pn md"><b style="font-size:18px">Conta cracked</b><span class="tag">Escolhe o teu nome (3 a 16 letras, números ou _).</span><input id="knick" placeholder="Nome" maxlength="16" autocomplete="off" value="${esc(S.knick||"")}"><span class="tag" id="kerr" style="color:#ff7b7b"></span><div class="row sb"><button class="btn" data-a="kclose">Cancelar</button><button class="btn p" data-a="kcrgo">Entrar</button></div></div></div>`;
+function kmodal(){if(S.km=="err"){const m=S.kerr,t=MSMSG[m.code]||MSMSG.server;return`<div class="ov" style="z-index:12"><div class="pn md"><b style="font-size:18px">${esc(t[0])}</b><span class="tag">${esc(t[1])}</span>${m.detail?`<code class="kdet" data-notr>${esc(m.detail)}</code>`:""}<div class="row sb"><button class="btn" data-a="kclose">Fechar</button><span class="row" style="gap:8px">${m.detail?`<button class="btn" data-a="kdcopy">Copiar detalhes</button>`:""}${t[2]?`<button class="btn p" data-a="kmgo" data-v="${esc(t[2])}">${I.ext}${esc(t[3])}</button>`:""}</span></div></div></div>`}
+ if(S.km=="cr")return`<div class="ov" style="z-index:12"><div class="pn md"><b style="font-size:18px">Conta cracked</b><span class="tag">Escolhe o teu nome (3 a 16 letras, números ou _).</span><input id="knick" placeholder="Nome" maxlength="16" autocomplete="off" value="${esc(S.knick||"")}"><span class="tag" id="kerr" style="color:#ff7b7b"></span><div class="row sb"><button class="btn" data-a="kclose">Cancelar</button><button class="btn p" data-a="kcrgo">Entrar</button></div></div></div>`;
  if(S.km=="code")return`<div class="ov" style="z-index:12"><div class="pn md"><b style="font-size:18px">Entrar com Microsoft</b>${S.kcode?`<span class="tag">Abre <b>${esc(S.kcode.url.replace(/^https?:\/\//,""))}</b> e escreve este código:</span><div class="code">${esc(S.kcode.code)}</div><div class="row sb"><button class="btn" data-a="kcopy">Copiar código</button><button class="btn p" data-a="kopen">${I.ext}Abrir a página</button></div><span class="tag">Esta janela fecha sozinha quando entrares.</span>`:`<span class="tag">${S.kfb?"A abrir a janela de entrada da Microsoft…":"A pedir o código à Microsoft…"}</span>`}<div class="row" style="justify-content:flex-end"><button class="btn" data-a="kclose">Cancelar</button></div></div></div>`;
  return""}
 /* ---------- intro (põe um ficheiro intro.mp4 ao lado do index.html para a usar) ---------- */
-function intro(){if(lsGet("kubo.intro","")==new Date().toDateString())return;lsSet("kubo.intro",new Date().toDateString());
+function intro(){if(!pfOn("intro",false)||lsGet("kubo.intro","")==new Date().toDateString())return;lsSet("kubo.intro",new Date().toDateString());
  const d=document.createElement("div");d.className="intro";d.innerHTML='<b>Sleep <span>Launcher</span></b>';document.body.appendChild(d);
  const v=document.createElement("video");v.src="intro.mp4";v.autoplay=true;v.muted=true;v.playsInline=true;
  v.onloadeddata=()=>{d.innerHTML="";d.style.animation="none";d.appendChild(v);v.play().catch(()=>{});v.onended=()=>d.remove()};
@@ -79,6 +80,10 @@ paint=function(){if(S.acc&&S.acc.offline){const go=()=>document.querySelectorAll
 /* o personagem 3D é criado uma vez e só muda de sítio quando a página é redesenhada (antes era refeito a cada desenho e tornava tudo lento) */
 function fallback2d(why){const ph=document.getElementById("sv3d");if(!ph)return;if(why)console.error("3D:",why);
  const c=document.createElement("canvas");c.className="fig";c.dataset.fig="";c.width=160;c.height=320;ph.replaceWith(c);paint()}
+/* com o jogo aberto o launcher não desenha 3D: a placa gráfica fica toda para o jogo */
+const gaming=()=>Object.keys(X.run).length>0;
+function gamePause(){if(gaming()){if(V3)V3.renderPaused=true;if(window.K3D)K3D.pause()}else render()}
+if(T)T.event.listen("game-state",()=>setTimeout(gamePause,0));
 function mount3d(){const ph=document.getElementById("sv3d");
  if(!ph){if(V3)V3.renderPaused=true;return}
  if(!window.skinview3d){fallback2d("skinview3d não carregou");return}
@@ -88,7 +93,7 @@ function mount3d(){const ph=document.getElementById("sv3d");
  if(!V3){cvs=document.createElement("canvas");cvs.id="sv3d";cvs.className="fig3d";
   try{V3=new skinview3d.SkinViewer({canvas:cvs,width:300,height:380,pixelRatio:Math.min(window.devicePixelRatio||1,1.5)});V3.zoom=.78;V3.controls.enableZoom=false;V3.controls.enablePan=false;V3.autoRotate=false;V3.camera.rotation.x=-.12;V3.playerWrapper.rotation.y=.5}catch(x){V3=null;cvs=null;toast("Personagem 3D indisponível: "+(x&&x.message||x));fallback2d(x);return}
   animate()}
- ph.replaceWith(cvs);if(bb.width>20)V3.setSize(Math.round(bb.width),Math.round(bb.height));V3.renderPaused=false;
+ ph.replaceWith(cvs);if(bb.width>20)V3.setSize(Math.round(bb.width),Math.round(bb.height));V3.renderPaused=gaming();
  if(key!=vkey){vkey=key;const mine=V3;let ok=false;skinSrc(url).then(u=>u||skinSrc("img/steve.png")).then(u=>{if(u&&V3===mine&&vkey==key)return mine.loadSkin(u,{model}).then(()=>curl?skinSrc(curl).then(c=>c?mine.loadCape(c):mine.resetCape()):mine.resetCape()).then(()=>{ok=true})}).catch(x=>{toast("Skin 3D: "+(x&&x.message||x));fallback2d(x);V3=null;cvs=null;vkey=""});
   setTimeout(()=>{if(!ok&&V3===mine&&vkey==key){toast("A skin 3D não carregou: a mostrar a skin em 2D");fallback2d("timeout");try{mine.dispose()}catch(e){}V3=null;cvs=null;vkey=""}},4000)}}
 /* só animações de repouso: respirar parado (da biblioteca skinview3d) e, por cima, o olhar a virar devagarinho para os lados */
@@ -158,20 +163,45 @@ function applyTheme(t){cur=t;lsSet("kubo.th2",JSON.stringify(t));const r=documen
 applyTheme(cur);
 const _theme=theme;theme=function(){applyTheme(cur)};
 const sw=t=>`<button class="tsw ${cur.a==t[1]&&cur.b==t[2]?"act":""}" data-a="kth" data-v="${t[0]}" title="${t[0]}" style="background:linear-gradient(135deg,${t[2]} 0 46%,${t[1]} 46% 100%)"><b>${cur.a==t[1]&&cur.b==t[2]?"✓":""}</b></button>`;
+/* ---------- preferências (ficam em settings.json, no Rust: não dependem do armazenamento da janela) ---------- */
+const pfOn=(k,d)=>S.pf[k]===undefined?d:!!S.pf[k];
+const pfRow=(k,d,t,s)=>`<div class="setrow"><span><b>${t}</b><small>${s}</small></span><div class="sw ${pfOn(k,d)?"on":""}" data-a="kpf" data-k="${k}" data-d="${d?1:0}" role="switch" aria-checked="${pfOn(k,d)}"></div></div>`;
+const pfVal=(k,vals)=>`<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px">${vals.map(v=>`<button class="btn ${(S.pf[k]===undefined?vals[0][0]:S.pf[k])==v[0]?"p":""}" data-a="kpv" data-k="${k}" data-v="${v[0]}">${v[1]}</button>`).join("")}</div>`;
+function applyPrefs(){document.documentElement.classList.toggle("rm",pfOn("reduce_motion",false));S.zf=0;fitZoom()}
+function savePref(k,v){S.pf[k]=v;inv("save_pref",{key:k,value:v}).catch(x=>{if(x!="preview")toast(er(x))});applyPrefs();render()}
+const msz2=b=>b>=1073741824?(b/1073741824).toFixed(1)+" GB":Math.max(0,Math.round(b/1048576))+" MB";
+function prefsH(){const tot=S.pf.total_ram||0,ram=[[0,"Automático"]].concat([4096,6144,8192,12288].filter(m=>!tot||m<=tot-2048).map(m=>[m,(m/1024)+" GB"]));
+ return`<div class="pn" style="padding:18px;margin-top:12px"><b>Geral</b>
+ <div class="setrow"><span><b>Abrir com o computador</b><small>O Sleep arranca escondido na bandeja quando ligas o computador.</small></span><div class="sw ${S.auto?"on":""}" data-a="auto" role="switch" aria-checked="${S.auto}"></div></div>
+ ${pfRow("close_to_tray",true,"Manter na bandeja ao fechar","Fechar a janela deixa o Sleep a correr, para abrir mais depressa da próxima vez.")}
+ ${pfRow("intro",false,"Animação de abertura","Mostra a animação do Sleep uma vez por dia.")}
+ ${pfRow("reduce_motion",false,"Reduzir animações","Desliga as transições da interface.")}
+ <div class="setblock"><b>Tamanho da interface</b>${pfVal("ui_scale",[[1,"100%"],[.9,"90%"],[1.1,"110%"],[1.25,"125%"]])}</div></div>
+ <div class="pn" style="padding:18px;margin-top:12px"><b>Jogo</b>
+ ${pfRow("fps_mode",false,"Modo FPS máximo","Desliga shaders, nuvens, sombras e VSync e tira o limite de FPS em todas as instâncias. Desligar repõe o que tinhas.")}
+ ${pfRow("hide_on_play",true,"Esconder o launcher ao jogar","Liberta a placa gráfica enquanto jogas. O launcher volta quando fechas o jogo.")}
+ ${pfRow("perf_new",true,"Mods de desempenho em instâncias novas","Liga por defeito a opção de instalar mods de FPS ao criar uma instância.")}
+ <div class="setblock"><b>Memória por defeito</b><small>Para as instâncias sem memória própria. Automático usa ${esc(msz2(({0:4096}[tot]||(tot<=8192?3072:tot<=12288?4096:tot<=16384?6144:8192))*1048576))} neste computador.</small>${pfVal("default_ram",ram)}</div></div>
+ <details class="pn adv" style="margin-top:12px"><summary>Avançado</summary><div class="advb">
+ <div class="setrow"><span><b>Versão</b><small>Sleep Launcher v${esc(S.pf.version||"")}</small></span><button class="btn" data-a="kupc">Procurar atualizações</button></div>
+ <div class="setrow"><span><b>Pasta do launcher</b><small>Instâncias, mundos e definições.</small></span><button class="btn" data-a="kdata">${I.folder}Abrir pasta</button></div>
+ <div class="setrow"><span><b>Limpar cache</b><small>${S.cacheB===undefined?"Fundos das instâncias e ficheiros temporários.":"Podes libertar "+esc(msz2(S.cacheB))+"."}</small></span><button class="btn" data-a="kcache">Limpar</button></div>
+ </div></details>`}
+document.addEventListener("click",async e=>{const el=e.target.closest("[data-a=kpf],[data-a=kpv],[data-a=kupc],[data-a=kdata],[data-a=kcache]");if(!el)return;e.stopPropagation();const a=el.dataset.a;
+ if(a=="kpf")savePref(el.dataset.k,!pfOn(el.dataset.k,el.dataset.d=="1"));
+ else if(a=="kpv")savePref(el.dataset.k,+el.dataset.v);
+ else if(a=="kdata")inv("open_data_dir").catch(x=>toast(er(x)));
+ else if(a=="kcache"){try{await inv("clear_cache");S.cacheB=0;toast("Cache limpa.");render()}catch(x){toast(er(x))}}
+ else if(a=="kupc"){toast("A procurar atualizações…",1);try{const u=await inv("app_check_update");if(u&&u.version){kclose("keep");S.updBusy=true;askUpd(u.version)}else toast("Já tens a versão mais recente.")}catch(x){toast(er(x))}}},true);
+document.addEventListener("toggle",e=>{if(e.target.classList&&e.target.classList.contains("adv")&&e.target.open&&S.cacheB===undefined)inv("cache_size").then(b=>{S.cacheB=b;if(S.page=="set"){render();const d=document.querySelector("details.adv");if(d)d.open=true}}).catch(()=>{})},true);
 const _vSet=vSet;
-vSet=function(){return`<div class="pad"><h1>Definições</h1><p class="sub">Muda o tema do launcher. As cores aplicam-se logo.</p>
+vSet=function(){return`<div class="pad"><h1>Definições</h1><p class="sub">Personaliza o launcher e o jogo. As mudanças aplicam-se logo.</p>
  <div class="pn" style="padding:18px"><b>Idioma</b><div class="vgrid langgrid">${KL.langs.map(l=>`<button class="vc ${l[0]==KL.get()?"act":""}" data-a="klset" data-v="${l[0]}" data-notr><i>${l[2]}</i><b>${l[1]}</b></button>`).join("")}</div></div>
  <div class="pn" style="padding:18px;margin-top:12px"><b>Temas</b><div class="tgrid">${TH.map(sw).join("")}</div>
  <div class="tcust"><b>Personalizar</b><div class="trow"><label>Cor de destaque<button class="cswatch" data-v="a" style="background:${cur.a}"></button></label><label>Cor de fundo<button class="cswatch" data-v="b" style="background:${cur.b}"></button></label><button class="btn" data-a="kthr">Repor</button></div>
  <div class="tprev" style="background:${cur.b}"><i style="background:${lite(cur.b,.05)};border-color:${lite(cur.b,.13)}"></i><u style="background:${cur.a}">Jogar</u></div></div></div>
  <div class="pn" style="padding:18px;margin-top:12px"><b>Fonte</b><div class="fgrid">${FONTS.map((f,i)=>`<button class="fbtn ${fcur&&fcur.kind=="sys"?(fcur.i==i?"act":""):(!fcur&&i==0?"act":"")}" data-a="kfn" data-v="${i}" style="font-family:${f[1]}">${f[0]}<small>Aa Bb 123</small></button>`).join("")}<label class="fbtn up ${fcur&&fcur.kind=="custom"?"act":""}"><b>${fcur&&fcur.kind=="custom"?esc(fcur.name||"A tua fonte"):"Carregar fonte…"}</b><small>.ttf · .otf · .woff2</small><input type="file" id="kfile" accept=".ttf,.otf,.woff,.woff2,font/*" hidden></label></div><button class="btn" data-a="kfr" style="margin-top:10px">Repor a fonte</button></div>
- <div class="pn row sb" style="padding:16px;margin-top:12px"><span>Abrir com o computador</span><div class="sw ${S.auto?"on":""}" data-a="auto" role="switch" aria-checked="${S.auto}"></div></div>
- <details class="pn adv" style="margin-top:12px"><summary>Avançado</summary>
- <div class="advb"><b>Login Microsoft</b><div class="tag">Application (client) ID da tua app no Azure</div><div class="row" style="margin-top:8px"><input id="ci" style="flex:1" value="${esc(S.ci)}" placeholder="00000000-0000-0000-0000-000000000000"><button class="btn" data-a="saveci">Guardar</button></div>
- <b style="margin-top:14px;display:block">CurseForge</b><div class="tag">${S.hasCf?"Chave guardada neste computador. Cola outra para a trocar.":"Chave de API da CurseForge (console.curseforge.com). Fica só neste computador."}</div><div class="row" style="margin-top:8px"><input id="cfk" type="password" style="flex:1" placeholder="Chave de API" autocomplete="off"><button class="btn" data-a="savecf">Guardar</button></div>
- <b style="margin-top:14px;display:block">Amigos e chat</b><div class="tag">Chave do cliente do site (só se o administrador a ligou).</div><div class="row" style="margin-top:8px"><input id="ssk" type="password" style="flex:1" placeholder="Chave do cliente (opcional)" autocomplete="off"><button class="btn" data-a="savesk">Guardar</button></div>
- <b style="margin-top:14px;display:block">Mod Sleep</b><div class="tag">Endereço do manifesto (JSON no teu site)</div><div class="row" style="margin-top:8px"><input id="mu" style="flex:1" value="${esc(S.mu)}" placeholder="https://…/manifesto.json"><button class="btn" data-a="savemu">Guardar</button></div></div></details></div>`};
-V.set=vSet;
+ ${prefsH()}</div>`};
 document.addEventListener("input",e=>{if(e.target.id=="tca"||e.target.id=="tcb"){const a=document.getElementById("tca").value,b=document.getElementById("tcb").value;applyTheme({n:"Personalizado",a,b});const pv=document.querySelector(".tprev");if(pv){pv.style.background=b;pv.firstChild.style.background=lite(b,.05);pv.lastChild.style.background=a}document.querySelectorAll(".tsw").forEach(x=>x.classList.remove("act"))}},true);
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a=kth],[data-a=kthr]");if(!el)return;e.stopPropagation();
  if(el.dataset.a=="kthr")applyTheme({n:"Sleep",a:"#4a67e8",b:"#0e0f13"});else{const t=TH.find(x=>x[0]==el.dataset.v);if(t)applyTheme({n:t[0],a:t[1],b:t[2]})}render()},true);
@@ -280,6 +310,8 @@ document.addEventListener("change",async e=>{const t=e.target;if(t.id!="kfile"||
 /* ---------- ícones das instâncias (cor de fundo + desenho, ou uma imagem tua) ---------- */
 let ICO={};try{ICO=JSON.parse(lsGet("kubo.icons","{}"))||{}}catch(e){}
 const saveIco=()=>lsSet("kubo.icons",JSON.stringify(ICO));
+/* ícone do modpack (só endereços https simples, para não poderem partir o estilo) */
+window.kSetIcon=(n,u)=>{if(/^https:\/\/[\w.\-\/%~]+$/.test(u)){ICO[n]={img:u};saveIco();render()}};
 const GL={sword:'<path d="M14.5 3.5L21 3l-.5 6.5L10 20l-6-6z"/><path d="M7 17l-3 3M5.5 12.5l6 6"/>',pick:'<path d="M5 6c4-3 10-3 14 0M12 6v14"/><path d="M5 6c-1 3 0 5 2 6M19 6c1 3 0 5-2 6"/>',cube:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5L12 12l8-4.5M12 12v9"/>',heart:'<path d="M12 20s-7-4.6-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.400-7 10-7 10z"/>',star:'<path d="M12 3l2.7 5.6 6.1.8-4.5 4.300 1.100 6.100L12 17l-5.400 2.800 1.100-6.100L3.200 9.400l6.100-.8z"/>',flask:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M8 15h8"/>',shield:'<path d="M12 3l8 3v6c0 4.500-3.200 7.700-8 9-4.800-1.300-8-4.500-8-9V6z"/>',crown:'<path d="M4 18h16l1-10-5 4-4-7-4 7-5-4z"/>',flame:'<path d="M12 21c-4 0-6.500-2.600-6.500-6 0-3 2-5 3.500-7 .5 2 1.500 3 3 3 0-3-1-5-1-7 4 2 7.500 6 7.500 11 0 3.400-2.500 6-6.500 6z"/>',leaf:'<path d="M5 19c0-9 5-14 15-14 0 10-5 15-14 15"/><path d="M5 19L14 10"/>'};
 const BGS2=["#4a67e8","#2fb86a","#e5484d","#f0a052","#b06bff","#2dd4bf","#ff6bb5","#f5c542","#6b7089","#1f2a5a"];
 const icoHTML=(name,sz,m)=>{m=m||ICO[name];const st=`width:${sz}px;height:${sz}px`;
@@ -314,8 +346,7 @@ xSave=async function(){const c=X.cfg,old=S.cur,ic=c&&c.ico;await _xSave();
  if(c&&ic!==undefined){if(old!=S.cur)delete ICO[old];if(ic&&(ic.bg||ic.img||ic.g))ICO[S.cur]=ic;else delete ICO[S.cur];saveIco();xInitCfg();render()}};
 
 /* ---------- importar instâncias de outros launchers (CurseForge, Modrinth App, Prism, ATLauncher, .minecraft...) ---------- */
-S.imp={list:[],pick:{},ver:{},ldr:{},busy:false,asked:false};
-let impNo=[];try{impNo=JSON.parse(lsGet("kubo.impno","[]"))||[]}catch(e){}
+S.imp={list:[],pick:{},ver:{},ldr:{},busy:false};
 const _modal4=modal;
 modal=function(){if(S.modal!="imp")return _modal4();const I2=S.imp,L=I2.list,rel=S.vers.slice(0,60);
  const groups={};L.forEach((x,i)=>{(groups[x.source]=groups[x.source]||[]).push(i)});
@@ -330,10 +361,11 @@ modal=function(){if(S.modal!="imp")return _modal4();const I2=S.imp,L=I2.list,rel
  <div class="implist">${Object.keys(groups).map(src=>{const ids=groups[src],all=ids.every(i=>I2.pick[i]===true),nogo=ids[0]!=null&&L[ids[0]].trashable;
   return`<div class="impgrp"><div class="impgh">${tile(src)}<b>${esc(src.replace(/-/g," "))}</b><span class="tag">${ids.length} · ${ids.reduce((n,i)=>n+L[i].mb,0)} MB</span>${nogo?`<span class="gonetag">já não está instalado</span>`:""}<button class="lnk" data-a="kimpa" data-v="${esc(src)}">${all?"Tirar todas":"Escolher todas"}</button></div>`+ids.map(i=>{const x=L[i],on=I2.pick[i]===true,v=I2.ver[i]||x.version||"",lo=I2.ldr[i]||x.loader||"fabric";
    return`<div class="impi ${on?"on":""}" data-a="kimpt" data-v="${i}"><i class="chk">${on?"✓":""}</i><div class="impt"><b>${esc(x.name)}</b><span>${x.mb} MB${x.version?` · ${esc(x.version)} · ${esc(ln(x.loader||"vanilla"))}`:" · escolhe a versão"}</span></div>${x.version?"":`<div class="impv" onclick="event.stopPropagation()"><select data-imp="v" data-i="${i}">${rel.map(r=>`<option ${r==(v||rel[0])?"selected":""}>${r}</option>`).join("")}</select><select data-imp="l" data-i="${i}">${["fabric","quilt","forge","neoforge","vanilla"].map(k=>`<option value="${k}" ${k==lo?"selected":""}>${LN[k]}</option>`).join("")}</select></div>`}</div>`}).join("")+`</div>`}).join("")}</div>
- <div class="row sb"><span class="row" style="gap:8px"><button class="btn" data-a="kimpc">Agora não</button><button class="btn" data-a="kimpn">Não voltar a perguntar</button>${gone.length?`<button class="btn dn" data-a="kimpl">${I.trash}Limpar restos</button>`:""}</span><button class="btn p" data-a="kimpg" ${I2.busy||!picked?"disabled":""}>${I2.busy?"A importar…":I.dl+"Importar "+(picked||"")}</button></div></div></div>`};
-async function scanImport(force){try{const raw=await inv("scan_launchers");const have=new Set(S.inst.map(i=>i.name.toLowerCase()));
-  S.imp.list=(raw||[]).filter(x=>!have.has(String(x.name).toLowerCase())&&(force||!impNo.includes(x.game)));S.imp.pick={};S.imp.ver={};S.imp.ldr={};
-  if(S.imp.list.length&&(force||!S.imp.asked)){S.imp.asked=true;if(!S.vers.length)await ids().catch(()=>{});S.modal="imp";render()}else if(force)toast("Não encontrei instâncias novas de outros launchers.")}catch(x){if(force)toast(er(x))}}
+ <div class="row sb"><span class="row" style="gap:8px"><button class="btn" data-a="kimpc">Cancelar</button>${gone.length?`<button class="btn dn" data-a="kimpl">${I.trash}Limpar restos</button>`:""}</span><button class="btn p" data-a="kimpg" ${I2.busy||!picked?"disabled":""}>${I2.busy?"A importar…":I.dl+"Importar "+(picked||"")}</button></div></div></div>`};
+/* só corre quando se carrega em Importar na página Instâncias */
+async function scanImport(){try{const raw=await inv("scan_launchers");const have=new Set(S.inst.map(i=>i.name.toLowerCase()));
+  S.imp.list=(raw||[]).filter(x=>!have.has(String(x.name).toLowerCase()));S.imp.pick={};S.imp.ver={};S.imp.ldr={};
+  if(S.imp.list.length){if(!S.vers.length)await ids().catch(()=>{});S.modal="imp";render()}else toast("Não encontrei instâncias novas de outros launchers.")}catch(x){toast(er(x))}}
 document.addEventListener("click",async e=>{const el=e.target.closest("[data-a^=kimp]");if(!el)return;e.stopPropagation();const a=el.dataset.a;
  if(a=="kimpt"){const i=+el.dataset.v;S.imp.pick[i]=S.imp.pick[i]!==true;const y=document.querySelector(".implist");const top=y?y.scrollTop:0;render();const y2=document.querySelector(".implist");if(y2)y2.scrollTop=top}
  else if(a=="kimpa"){const ids=S.imp.list.map((x,i)=>x.source==el.dataset.v?i:-1).filter(i=>i>=0),all=ids.every(i=>S.imp.pick[i]===true);ids.forEach(i=>S.imp.pick[i]=!all);const y=document.querySelector(".implist"),top=y?y.scrollTop:0;render();const y2=document.querySelector(".implist");if(y2)y2.scrollTop=top}
@@ -341,16 +373,14 @@ document.addEventListener("click",async e=>{const el=e.target.closest("[data-a^=
  else if(a=="kimpb"){S.imp.confirm=false;render()}
  else if(a=="kimpd"&&!S.imp.busy){S.imp.busy=true;render();try{const paths=S.imp.list.filter(x=>x.trashable).map(x=>x.root),n=await inv("trash_leftovers",{paths});S.imp.list=S.imp.list.filter(x=>!x.trashable);S.imp.confirm=false;S.imp.busy=false;if(!S.imp.list.length)S.modal="";render();toast(n?`Mandei ${n} pasta${n==1?"":"s"} para o Lixo.`:"Não consegui mandar nada para o Lixo.")}catch(x){S.imp.busy=false;render();toast(er(x))}}
  else if(a=="kimpc"){S.modal="";render()}
- else if(a=="kimpn"){impNo=impNo.concat(S.imp.list.map(x=>x.game));lsSet("kubo.impno",JSON.stringify(impNo));S.modal="";render()}
  else if(a=="kimpg"&&!S.imp.busy){S.imp.busy=true;render();let n=0;
   for(let i=0;i<S.imp.list.length;i++){if(S.imp.pick[i]!==true)continue;const x=S.imp.list[i];let name=x.name,k=2;const have=new Set(S.inst.map(q=>q.name.toLowerCase()));while(have.has(name.toLowerCase()))name=x.name+" ("+(k++)+")";
    const ver=x.version||S.imp.ver[i]||S.vers[0],ld=(x.version?x.loader:S.imp.ldr[i])||"fabric";
    try{toast("A criar "+name+"…",1);await inv("create_instance",{name,version:ver,loader:ld||"vanilla"});const dst=await inv("instance_game_dir",{name});await inv("import_copy",{src:x.game,dst,label:"Importar "+name});n++;await ids()}catch(err){toast("Não deu para importar "+x.name+": "+String(err))}}
   S.imp.busy=false;S.modal="";await ids();render();toast(n?`Importei ${n} instância${n==1?"":"s"}. Instalo o jogo quando carregares em Jogar.`:"Nada importado.")}
- else if(a=="kimp"){scanImport(true)}
+ else if(a=="kimp"){scanImport()}
 },true);
 document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&t.dataset.imp){e.stopImmediatePropagation();const i=+t.dataset.i;(t.dataset.imp=="v"?S.imp.ver:S.imp.ldr)[i]=t.value}},true);
-let impDone=false;
 
 /* fundo de cada instância = o fundo do menu inicial dessa versão do Minecraft (tirado do client.jar dela) */
 S.pano={};const panoAsked={};
@@ -438,6 +468,7 @@ const okSvg=x=>typeof x=="string"&&/^\s*<svg/i.test(x)&&!/<script|on\w+\s*=|java
 const ldLogo=k=>{const svg=LDI[k=="vanilla"?"minecraft":k];return svg&&okSvg(svg)?`<i class="ldlogo">${svg}</i>`:`<i style="background:${(LD[k]||[])[2]||"#777"}">${LN[k][0]}</i>`};
 const _modal=modal;
 modal=function(){if(S.modal!="new")return _modal();
+ if(S.nf.perf===undefined&&!pfOn("perf_new",true))S.nf.perf=false;
  return`<div class="ov"><div class="pn md newi"><div class="nh"><div class="nico">${I.box}</div><div><b>Nova instância</b><span>Um jogo à parte, com os seus próprios mods, packs e mundos.</span></div></div>
  <div class="fl"><em>Ícone</em><div class="icopick"><div class="icoprev">${icoHTML("",64,S.nf.ico)||ibox(S.nf.name||"Nova","")}</div><div class="icoctl"><div class="icobgs">${BGS2.map(c=>`<button class="icobg ${S.nf.ico&&S.nf.ico.bg==c?"act":""}" data-a="kicbg" data-v="${c}" style="background:${c}"></button>`).join("")}</div><div class="icogs">${Object.keys(GL).map(g=>`<button class="icog ${S.nf.ico&&S.nf.ico.g==g?"act":""}" data-a="kicg" data-v="${g}"><svg viewBox="0 0 24 24">${GL[g]}</svg></button>`).join("")}</div><div class="row"><label class="btn">Carregar imagem<input type="file" id="kicf" accept="image/*" hidden></label>${S.nf.ico?`<button class="btn" data-a="kicx">Tirar</button>`:""}</div></div></div></div>
  <label class="fl"><em>Nome</em><input id="nn" placeholder="Ex.: Survival com amigos" value="${esc(S.nf.name)}" maxlength="40" autocomplete="off"></label>
@@ -519,7 +550,7 @@ render=function(){syncGate();if(!S.ready||!S.acc)return;
    corre também quando o #app muda, venha o desenho de onde vier */
 let posting=false;
 function post(){if(posting)return;posting=true;try{const t=document.querySelector('header.top');if(t)t.setAttribute('data-tauri-drag-region','')}catch(x){}if(!S.ready||!S.acc){posting=false;return}
- for(const f of [()=>{S.inst.forEach(loadPano)},()=>{if(!S.__hz){S.__hz=1;loadHz().then(()=>render());loadAllV()}},()=>{if(!impDone&&T&&S.acc){impDone=true;setTimeout(()=>scanImport(false),1500)}},capeCards,()=>{if(!vpnSynced&&T){vpnSynced=true;vpnApply()}},slideBar,enhanceSelects,mount3d,splitter,sideSplit,()=>{if(S.page=="play")loadNews()},swapIcons,heroApply]){try{f()}catch(x){console.error(x);if(f===mount3d)fallback2d(x)}}
+ for(const f of [()=>{S.inst.forEach(loadPano)},()=>{if(!S.__hz){S.__hz=1;loadHz().then(()=>render());loadAllV()}},capeCards,()=>{if(!vpnSynced&&T){vpnSynced=true;vpnApply()}},slideBar,enhanceSelects,mount3d,splitter,sideSplit,()=>{if(S.page=="play")loadNews()},swapIcons,heroApply]){try{f()}catch(x){console.error(x);if(f===mount3d)fallback2d(x)}}
  posting=false}
 new MutationObserver(()=>post()).observe(document.getElementById("app"),{childList:true});
 new MutationObserver(()=>{if(document.querySelector("#app select:not([data-k]):not([data-a=sel])"))enhanceSelects()}).observe(document.getElementById("app"),{childList:true,subtree:true});
@@ -562,11 +593,13 @@ function swapIcons(){document.querySelectorAll(".nv[data-v]").forEach(b=>{const 
 
 /* ---------- cliques (antes do app.js) ---------- */
 document.addEventListener("click",async e=>{const el=e.target.closest("[data-a^=k]");if(!el)return;const a=el.dataset.a,v=el.dataset.v;
- const mine=["kms","kcr","kskip","kbug","krev","kcrgo","kclose","kcopy","kopen","klink"];if(!mine.includes(a))return;e.stopPropagation();
- if(a=="kms"){S.km="code";S.kcode=null;S.kfb=true;render();try{S.acc=await inv("ms_login");S.km="";S.guest=false;lsSet("kubo.guest","")}catch(x){S.km="";toast(er(x))}S.kcode=null;await ids();render()}
+ const mine=["kms","kcr","kskip","kbug","krev","kcrgo","kclose","kcopy","kopen","klink","kmgo","kdcopy"];if(!mine.includes(a))return;e.stopPropagation();
+ if(a=="kms"){S.km="code";S.kcode=null;S.kfb=true;render();try{S.acc=await inv("ms_login");S.km="";S.guest=false;lsSet("kubo.guest","")}catch(x){const m=msParse(x);if(m&&m.code=="cancelled")S.km="";else if(m){S.kerr=m;S.km="err"}else{S.km="";toast(er(x))}}S.kcode=null;await ids();render()}
  else if(a=="kcr"){S.km="cr";render();setTimeout(()=>{const i=document.getElementById("knick");if(i)i.focus()},30)}
  else if(a=="kcrgo"){const n=document.getElementById("knick").value.trim();S.knick=n;try{S.acc=await inv("offline_login",{name:n});S.km="";S.guest=false;await ids();render()}catch(x){const r=document.getElementById("kerr");if(r)r.textContent=String(x)}}
- else if(a=="kclose"){S.km="";render()}
+ else if(a=="kclose"){if(S.km=="code")inv("ms_login_cancel").catch(()=>{});S.km="";render()}
+ else if(a=="kmgo")inv("open_url",{url:v}).catch(x=>toast(er(x)))
+ else if(a=="kdcopy"){try{await navigator.clipboard.writeText(S.kerr.code+" "+S.kerr.detail);toast("Detalhes copiados.")}catch(x){}}
  else if(a=="kskip"){S.guest=true;lsSet("kubo.guest","1");render()}
  else if(a=="kbug")inv("open_url",{url:SITE+"/?bug"}).catch(x=>toast(er(x)))
  else if(a=="krev")inv("open_url",{url:SITE+"/?reviews"}).catch(x=>toast(er(x)))
@@ -610,20 +643,24 @@ function updBox(){let b=document.getElementById("kupd");if(!b){b=document.create
  if(!b.dataset.h){b.dataset.h=1;b.addEventListener("click",e=>{const u=e.target.closest("[data-u]");if(!u)return;const k=u.dataset.u;
   if(k=="no"){inv("quit_app").catch(()=>{try{window.close()}catch(x){}})}
   else if(k=="yes"||k=="retry"){doUpd(S.updVer)}
+  else if(k=="manual"){inv("open_url",{url:"https://github.com/Martim2012OOG/sleep-launcher/releases/latest"}).catch(x=>toast(er(x)))}
   else if(k=="x"){b.remove();S.updBusy=false}})}
  return b}
 /* há uma versão nova: a app não deixa continuar sem atualizar (Sim atualiza, Não fecha a app) */
 function askUpd(v){S.updVer=v;updBox().innerHTML=`<div class="ubox"><img src="img/mascot.png" alt=""><b>Esta app tem uma nova versão</b><span class="tag">Por favor atualiza a app para continuar a jogar. Queres atualizar agora?</span><span class="tag">v${esc(v||"")}</span><div class="row" style="gap:10px;justify-content:center;margin-top:6px"><button class="btn" data-u="no">Não, fechar a app</button><button class="btn p" data-u="yes">Sim, atualizar</button></div></div>`}
-function showUpd(v,err){const b=updBox();
+/* a atualização foi instalada mas a app continua na versão antiga: não volta a forçar, explica e deixa instalar à mão */
+function updFailed(v){S.updVer=v;updBox().innerHTML=`<div class="ubox"><b>A atualização não ficou instalada</b><span class="tag">Continuas na versão ${esc(S.pf.version||"")}. Descarrega o instalador da versão ${esc(v||"")} e instala-o por cima.</span><div class="row" style="gap:10px;justify-content:center;margin-top:6px"><button class="btn" data-u="x">Continuar</button><button class="btn" data-u="retry">Tentar outra vez</button><button class="btn p" data-u="manual">Descarregar</button></div></div>`}
+function updMove(){updBox().innerHTML=`<div class="ubox"><b>Move o Sleep Launcher para a pasta Aplicações</b><span class="tag">O macOS não deixa atualizar uma app aberta a partir do disco de instalação ou dos Downloads. Fecha o Sleep, arrasta-o para Aplicações e abre-o de lá.</span><div class="row" style="gap:10px;justify-content:center;margin-top:6px"><button class="btn" data-u="x">Agora não</button><button class="btn p" data-u="no">Fechar a app</button></div></div>`}
+function showUpd(v,err){if(err==="UPD_MOVE"){updMove();return}const b=updBox();
  b.innerHTML=err?`<div class="ubox"><b>Não foi possível atualizar. Tenta outra vez mais tarde.</b><div class="row" style="gap:10px;justify-content:center"><button class="btn" data-u="no">Fechar a app</button><button class="btn p" data-u="retry">Tentar outra vez</button></div></div>`
  :`<div class="ubox"><img src="img/mascot.png" alt=""><b>A atualizar o Sleep Launcher</b><span class="tag">Versão ${esc(v||"")} · não feches a janela, abre sozinho quando acabar.</span><div class="ubar"><i id="kubar"></i></div></div>`}
 async function doUpd(v){try{showUpd(v);await inv("app_install_update")}catch(x){showUpd(null,String(x))}}
 if(T)T.event.listen("progress",ev=>{const p=ev.payload;if(p&&p.stage=="Launcher"){const e=document.getElementById("kubar");if(e)e.style.width=Math.min(100,Math.round(p.done*100/Math.max(1,p.total)))+"%"}});
-async function autoUpd(){if(!T||S.updBusy)return;try{const u=await inv("app_check_update");if(!u||!u.version)return;S.updBusy=true;askUpd(u.version)}catch(x){}}
-if(T){setTimeout(autoUpd,1500);setInterval(autoUpd,30*60*1000)}
+async function autoUpd(){if(!T||S.updBusy)return;try{const u=await inv("app_check_update");if(!u||!u.version)return;S.updBusy=true;if(S.pf.update_failed==u.version){delete S.pf.update_failed;updFailed(u.version)}else askUpd(u.version)}catch(x){}}
+if(T)setInterval(autoUpd,30*60*1000);
 /* ecrã maximizado fica igual ao normal: a página é ampliada em proporção ao tamanho da janela */
 async function fitZoom(){try{const A=window.__TAURI__;if(!A||!A.window||!A.webview)return;const w=A.window.getCurrentWindow(),[sz,sf]=await Promise.all([w.innerSize(),w.scaleFactor()]);
- const W=sz.width/sf,H=sz.height/sf,f=Math.round(Math.min(2,Math.max(1,Math.min(W/1160,H/740)))*20)/20;
+ const W=sz.width/sf,H=sz.height/sf,f=Math.round(Math.min(2,Math.max(1,Math.min(W/1160,H/740))*(+S.pf.ui_scale||1))*20)/20;
  if(Math.abs((S.zf||1)-f)>.001){S.zf=f;await A.webview.getCurrentWebview().setZoom(f)}}catch(e){}}
 addEventListener("resize",()=>{clearTimeout(S.zt);S.zt=setTimeout(fitZoom,150)});setTimeout(fitZoom,400);
 
@@ -649,7 +686,7 @@ const HERO=[["image","Imagem clássica"],["auto","Automático"],["christmas","Na
 const heroKey=()=>{const v=lsGet("kubo.hero","image");if(v&&v!="auto")return v;const m=new Date().getMonth();return m>=10?"christmas":"fnaf"};
 let K3L=null,K3S="";
 function heroApply(){const h=document.querySelector(".hero");if(!h){if(window.K3D)K3D.pause();return}const k=heroKey();
- if(k=="image"){if(window.K3D)K3D.pause();h.classList.remove("h3d");return}
+ if(k=="image"||gaming()){if(window.K3D)K3D.pause();h.classList.remove("h3d");return}
  if(!K3L)K3L=new Promise(r=>{const s=document.createElement("script");s.src="vendor/scene3d.js";s.onload=()=>r(1);s.onerror=()=>r(0);document.head.appendChild(s)});
  K3L.then(ok=>{if(!ok||!window.K3D)return;const hh=document.querySelector(".hero");if(!hh)return;
   /* o boneco é 3D dentro do cenário, com a tua skin */
@@ -659,7 +696,9 @@ function heroApply(){const h=document.querySelector(".hero");if(!h){if(window.K3
   K3D.mount(hh,{scene:k,skin:use,slim:!!(sk&&sk.variant=="SLIM")})})}
 function heroSection(){const cur=lsGet("kubo.hero","image")||"image";return`<h3 class="vh">Fundo da página inicial</h3><p class="tag">Cena 3D que aparece atrás do teu boneco. Automático: Natal de 1 de novembro a 31 de dezembro, o resto do ano a cena normal.</p><div class="row" style="gap:8px;flex-wrap:wrap">${HERO.map(h=>`<button class="btn ${cur===h[0]?"p":""}" data-a="khero" data-v="${h[0]}">${h[1]}</button>`).join("")}</div>`}
 const _vSet4=vSet;vSet=function(){const h=_vSet4();return h.replace(/<\/div>\s*$/,heroSection()+"</div>")};
+V.set=vSet;
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a=khero]");if(!el)return;e.stopPropagation();lsSet("kubo.hero",el.dataset.v);render();heroApply()},true);
 
-inv("get_account").then(a=>{S.acc=a}).catch(()=>{}).finally(()=>{S.ready=true;render();intro()});
+/* o idioma e as preferências vêm de settings.json antes de a interface aparecer */
+Promise.all([inv("get_account").then(a=>{S.acc=a}).catch(()=>{}),inv("get_settings").then(r=>{S.pf=r||{};if(r&&["en","pt","es"].includes(r.lang))KL.init(r.lang);else if(T)inv("save_pref",{key:"lang",value:KL.get()}).catch(()=>{})}).catch(()=>{})]).finally(()=>{applyPrefs();S.ready=true;render();intro();if(T){setTimeout(autoUpd,1500);setTimeout(()=>inv("prefetch_mods").catch(()=>{}),2500)}});
 })();

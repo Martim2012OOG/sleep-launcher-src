@@ -73,7 +73,9 @@ pub async fn search(kind: &str, query: &str, mc: &str, loader: &str, category: &
         f.push(json!([format!("versions:{mc}")]));
     }
     if kind == "modpack" {
-        f.push(json!(["categories:fabric"]));
+        if !loader.is_empty() {
+            f.push(json!([format!("categories:{loader}")]));
+        }
     } else if kind == "mod" {
         let l = mr_loaders(loader);
         if !l.is_empty() {
@@ -309,11 +311,18 @@ pub async fn latest_file(pid: &str, kind: &str, mc: &str, loader: &str) -> Resul
     }))
 }
 
-/// Descarrega o .mrpack da versão Fabric mais recente e devolve (modrinth.index.json, bytes do zip).
-pub async fn fetch_pack(project: &str) -> Result<(Value, Vec<u8>), String> {
-    let q = [("loaders", json!(["fabric"]).to_string())];
+/// Descarrega o .mrpack da versão mais recente (estável se houver) que serve aos filtros e devolve (modrinth.index.json, bytes do zip).
+pub async fn fetch_pack(project: &str, mc: &str, loader: &str) -> Result<(Value, Vec<u8>), String> {
+    let mut q = vec![];
+    if !mc.is_empty() {
+        q.push(("game_versions", json!([mc]).to_string()));
+    }
+    if !loader.is_empty() {
+        q.push(("loaders", json!([loader]).to_string()));
+    }
     let vs = get(&format!("{API}/project/{project}/version"), &q).await?;
-    let v = vs.as_array().and_then(|a| a.first()).cloned().ok_or("este modpack não tem versão Fabric")?;
+    let list = vs.as_array().cloned().unwrap_or_default();
+    let v = list.iter().find(|x| x["version_type"].as_str() == Some("release")).or(list.first()).cloned().ok_or("este modpack não tem versão para esses filtros")?;
     let files = v["files"].as_array().cloned().unwrap_or_default();
     let f = files
         .iter()
@@ -333,6 +342,17 @@ pub async fn fetch_pack(project: &str) -> Result<(Value, Vec<u8>), String> {
         std::io::Read::read_to_string(&mut ix, &mut txt).map_err(e)?;
     }
     Ok((serde_json::from_str(&txt).map_err(e)?, bytes.to_vec()))
+}
+
+/// (loader, versão do loader) de um modrinth.index.json.
+pub fn pack_loader(index: &Value) -> (&'static str, Option<String>) {
+    let d = &index["dependencies"];
+    for (k, l) in [("fabric-loader", "fabric"), ("quilt-loader", "quilt"), ("neoforge", "neoforge"), ("forge", "forge")] {
+        if let Some(v) = d[k].as_str() {
+            return (l, Some(v.to_string()));
+        }
+    }
+    ("vanilla", None)
 }
 
 fn rel_ok(p: &str) -> Option<PathBuf> {
@@ -368,11 +388,25 @@ pub async fn apply_pack(app: &AppHandle, game: &Path, index: &Value, bytes: &[u8
                 let game = game.to_path_buf();
                 async move {
                     let path = f["path"].as_str().and_then(rel_ok).ok_or("caminho inválido no modpack".to_string())?;
-                    let url = f["downloads"][0].as_str().ok_or("ficheiro sem download".to_string())?.to_string();
-                    if !host_ok(&url) {
-                        return Err(format!("servidor não permitido: {url}"));
+                    let urls: Vec<String> = f["downloads"].as_array().cloned().unwrap_or_default().iter().filter_map(|x| x.as_str().map(String::from)).filter(|u| host_ok(u)).collect();
+                    if urls.is_empty() {
+                        return Err("ficheiro sem download permitido no modpack".to_string());
                     }
-                    let b = c.get(&url).send().await.map_err(e)?.error_for_status().map_err(e)?.bytes().await.map_err(e)?;
+                    let mut got = None;
+                    let mut last = String::new();
+                    for url in &urls {
+                        match c.get(url).send().await.and_then(|r| r.error_for_status()) {
+                            Ok(r) => match r.bytes().await {
+                                Ok(b) => {
+                                    got = Some(b);
+                                    break;
+                                }
+                                Err(x) => last = x.to_string(),
+                            },
+                            Err(x) => last = x.to_string(),
+                        }
+                    }
+                    let b = got.ok_or(last)?;
                     if let Some(h) = f["hashes"]["sha1"].as_str() {
                         if format!("{:x}", Sha1::digest(&b)) != h.to_lowercase() {
                             return Err(format!("{}: SHA1 não bate certo", path.display()));
@@ -394,26 +428,40 @@ pub async fn apply_pack(app: &AppHandle, game: &Path, index: &Value, bytes: &[u8
         n += 1;
         let _ = app.emit("progress", json!({ "stage": "Modpack", "done": n, "total": total }));
     }
+    extract_overrides(bytes, game, &["overrides", "client-overrides"])?;
+    Ok(())
+}
+
+/// Copia as pastas de overrides do zip do modpack para o jogo (pela ordem dada: a última ganha).
+pub fn extract_overrides(bytes: &[u8], game: &Path, prefixes: &[&str]) -> Result<(), String> {
     let mut z = zip::ZipArchive::new(Cursor::new(bytes)).map_err(e)?;
-    for i in 0..z.len() {
-        let mut en = z.by_index(i).map_err(e)?;
-        let Some(p) = en.enclosed_name() else { continue };
-        let rel = if let Ok(r) = p.strip_prefix("overrides") {
-            r.to_path_buf()
-        } else if let Ok(r) = p.strip_prefix("client-overrides") {
-            r.to_path_buf()
-        } else {
-            continue;
-        };
-        if en.is_dir() || rel.as_os_str().is_empty() {
-            continue;
+    for pre in prefixes {
+        for i in 0..z.len() {
+            let mut en = z.by_index(i).map_err(e)?;
+            let Some(p) = en.enclosed_name() else { continue };
+            let Ok(rel) = p.strip_prefix(pre) else { continue };
+            if en.is_dir() || rel.as_os_str().is_empty() {
+                continue;
+            }
+            let t = game.join(rel);
+            if let Some(d) = t.parent() {
+                std::fs::create_dir_all(d).map_err(e)?;
+            }
+            let mut out = std::fs::File::create(&t).map_err(e)?;
+            std::io::copy(&mut en, &mut out).map_err(e)?;
         }
-        let t = game.join(rel);
-        if let Some(d) = t.parent() {
-            std::fs::create_dir_all(d).map_err(e)?;
-        }
-        let mut out = std::fs::File::create(&t).map_err(e)?;
-        std::io::copy(&mut en, &mut out).map_err(e)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loader_do_mrpack() {
+        assert_eq!(pack_loader(&json!({"dependencies": {"minecraft": "1.21.1", "neoforge": "21.1.172"}})), ("neoforge", Some("21.1.172".to_string())));
+        assert_eq!(pack_loader(&json!({"dependencies": {"minecraft": "1.20.1", "fabric-loader": "0.16.0"}})), ("fabric", Some("0.16.0".to_string())));
+        assert_eq!(pack_loader(&json!({"dependencies": {"minecraft": "1.20.1"}})), ("vanilla", None));
+    }
 }

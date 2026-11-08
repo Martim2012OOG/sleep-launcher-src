@@ -126,6 +126,7 @@ pub fn start(app: &AppHandle, name: &str, mut cmd: Command) -> Result<(), String
         };
         push(&name, session, txt);
         let _ = app.emit("game-state", json!({"name": name, "running": false, "code": code}));
+        crate::after_game(&app);
         if let Some(c) = code.filter(|c| *c != 0) {
             let _ = app.emit("play-result", format!("O jogo fechou com erro (código {c}). Abre a Consola da instância para ver porquê."));
         }

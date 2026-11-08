@@ -42,7 +42,7 @@ fn ver(x: &Value) -> String {
 
 /// Devolve (id do perfil, json fundido) com o loader estável mais recente.
 /// `quilt` escolhe o Quilt (meta.quiltmc.org, mesmo formato do Fabric); senão é o Fabric.
-pub async fn profile(mc: &str, parent: &Value, quilt: bool) -> Result<(String, Value), String> {
+pub async fn profile(mc: &str, parent: &Value, quilt: bool, fixed: Option<&str>) -> Result<(String, Value), String> {
     let (nome, base) = if quilt {
         ("Quilt", "https://meta.quiltmc.org/v3/versions/loader")
     } else {
@@ -60,7 +60,8 @@ pub async fn profile(mc: &str, parent: &Value, quilt: bool) -> Result<(String, V
         }))
         .or(arr.first())
         .ok_or(format!("O {nome} ainda não suporta esta versão"))?;
-    let lv = ver(pick);
+    // um modpack pode fixar a versão exata do loader
+    let lv = fixed.map(String::from).unwrap_or_else(|| ver(pick));
     if lv.is_empty() {
         return Err("sem versão do loader".into());
     }

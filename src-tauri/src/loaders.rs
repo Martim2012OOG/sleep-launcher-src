@@ -36,7 +36,14 @@ pub fn pick_neo(all: &[String], prefix: &str) -> Option<String> {
 }
 
 /// (url do instalador, versão do loader, nome para mostrar)
-async fn resolve(mc: &str, neo: bool) -> Result<(String, String, &'static str), String> {
+async fn resolve(mc: &str, neo: bool, fixed: Option<&str>) -> Result<(String, String, &'static str), String> {
+    if let Some(v) = fixed {
+        return Ok(if neo {
+            (format!("https://maven.neoforged.net/releases/net/neoforged/neoforge/{v}/neoforge-{v}-installer.jar"), v.to_string(), "NeoForge")
+        } else {
+            (format!("https://maven.minecraftforge.net/net/minecraftforge/forge/{mc}-{v}/forge-{mc}-{v}-installer.jar"), v.to_string(), "Forge")
+        });
+    }
     if neo {
         let prefix = neo_prefix(mc).ok_or("o NeoForge não suporta esta versão do Minecraft")?;
         let r = fetch_json("https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge").await?;
@@ -89,8 +96,8 @@ fn hide(c: &mut std::process::Command) {
 
 /// Instala o Forge/NeoForge para `mc` (o vanilla já tem de estar instalado em `shared`).
 /// Devolve (id do perfil, json do perfil tal como o instalador o escreveu: ainda com inheritsFrom).
-pub async fn install(app: &AppHandle, root: &Path, shared: &Path, mc: &str, neo: bool, java_major: u64) -> Result<(String, Value), String> {
-    let (url, lv, nome) = resolve(mc, neo).await?;
+pub async fn install(app: &AppHandle, root: &Path, shared: &Path, mc: &str, neo: bool, java_major: u64, fixed: Option<&str>) -> Result<(String, Value), String> {
+    let (url, lv, nome) = resolve(mc, neo, fixed).await?;
     let stage = format!("Instalador do {nome}");
     let progress = |d: u32| {
         let _ = app.emit("progress", json!({"stage": stage, "done": d, "total": 2}));

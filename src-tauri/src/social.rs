@@ -96,7 +96,7 @@ async fn call(app: &AppHandle, key: &str, method: &str, path: &str, body: Option
         return Err("SESSION_EXPIRED".into());
     }
     if st == 403 && msg(st, &v).to_lowercase().contains("client key") {
-        return Err("Chave do cliente inválida (vê Definições)".into());
+        return Err("O servidor de amigos recusou a ligação. Tenta mais tarde.".into());
     }
     if !(200..300).contains(&st) {
         return Err(msg(st, &v));

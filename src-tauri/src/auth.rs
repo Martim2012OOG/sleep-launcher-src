@@ -109,28 +109,55 @@ pub fn public(a: &Value) -> Value {
     json!({"name": a["name"], "uuid": a["uuid"], "skins": a["skins"], "capes": a["capes"], "offline": a["offline"].as_bool().unwrap_or(false)})
 }
 
-fn xerr(t: &Value, code: u16) -> String {
-    match t["XErr"].as_u64() {
-        Some(2148916233) => "Esta conta Microsoft não tem perfil Xbox".to_string(),
-        Some(2148916238) => "Conta de menor: tem de fazer parte de uma família Microsoft".to_string(),
-        Some(2148916235) => "O Xbox Live não está disponível no teu país".to_string(),
-        _ => {
-            let m = t["errorMessage"].as_str().or(t["error"].as_str()).unwrap_or("falha no login");
-            if m.contains("Invalid app registration") {
-                "A tua app ainda não foi aprovada pela Mojang (aka.ms/mce-reviewappid). Até lá usa o modo offline.".to_string()
-            } else {
-                format!("Erro {code}: {m}")
-            }
-        }
-    }
+/// Erro de login que a interface sabe explicar: "MSERR|código|detalhe" (o detalhe nunca leva tokens).
+fn mserr(code: &str, detail: impl std::fmt::Display) -> String {
+    let d: String = detail.to_string().chars().filter(|c| *c != '|').take(180).collect();
+    format!("MSERR|{code}|{d}")
 }
 
-async fn post(url: &str, body: Value) -> Result<Value, String> {
-    let r = reqwest::Client::new().post(url).header("Accept", "application/json").json(&body).send().await.map_err(e)?;
+fn http() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder().user_agent("SleepLauncher/1.0").connect_timeout(std::time::Duration::from_secs(15)).timeout(std::time::Duration::from_secs(30)).build().map_err(e)
+}
+
+fn neterr(step: &str, x: reqwest::Error) -> String {
+    mserr("network", format!("{step}: {}", if x.is_timeout() { "timeout" } else if x.is_connect() { "connect" } else { "request" }))
+}
+
+/// Código do Xbox (XErr) -> motivo real.
+fn xbox_code(x: u64) -> Option<&'static str> {
+    Some(match x {
+        2148916227 => "banned",
+        2148916229 => "restricted",
+        2148916233 => "no_xbox",
+        2148916234 => "tos",
+        2148916235 => "region",
+        2148916236 | 2148916237 => "adult_check",
+        2148916238 => "child",
+        _ => return None,
+    })
+}
+
+fn xerr(t: &Value, code: u16, step: &str) -> String {
+    let x = t["XErr"].as_u64().unwrap_or(0);
+    if let Some(c) = xbox_code(x) {
+        return mserr(c, format!("{step} HTTP {code} XErr {x}"));
+    }
+    let m = t["errorMessage"].as_str().or(t["error"].as_str()).or(t["Message"].as_str()).unwrap_or("");
+    if m.contains("Invalid app registration") {
+        return mserr("app_blocked", format!("{step} HTTP {code}"));
+    }
+    if code == 429 {
+        return mserr("rate", format!("{step} HTTP 429"));
+    }
+    mserr("server", format!("{step} HTTP {code} {} {m}", if x > 0 { format!("XErr {x}") } else { String::new() }))
+}
+
+async fn post(url: &str, body: Value, step: &str) -> Result<Value, String> {
+    let r = http()?.post(url).header("Accept", "application/json").json(&body).send().await.map_err(|x| neterr(step, x))?;
     let st = r.status();
     let t: Value = r.json().await.unwrap_or(Value::Null);
     if !st.is_success() {
-        return Err(xerr(&t, st.as_u16()));
+        return Err(xerr(&t, st.as_u16(), step));
     }
     Ok(t)
 }
@@ -146,11 +173,25 @@ async fn token(form: &[(&str, &str)]) -> Result<Value, String> {
 }
 
 async fn get_profile(tok: &str) -> Result<Value, String> {
-    let r = reqwest::Client::new().get(format!("{MC}/minecraft/profile")).bearer_auth(tok).send().await.map_err(e)?;
-    if r.status().as_u16() == 404 {
-        return Err("Esta conta não tem o Minecraft: Java Edition".to_string());
+    let c = http()?;
+    let r = c.get(format!("{MC}/minecraft/profile")).bearer_auth(tok).send().await.map_err(|x| neterr("profile", x))?;
+    let st = r.status().as_u16();
+    if st == 404 {
+        // comprou o jogo mas nunca criou o nome, ou não tem mesmo o jogo?
+        let ent: Value = match c.get(format!("{MC}/entitlements/mcstore")).bearer_auth(tok).send().await {
+            Ok(x) => x.json().await.unwrap_or(Value::Null),
+            Err(_) => Value::Null,
+        };
+        let owns = ent["items"].as_array().is_some_and(|i| !i.is_empty());
+        return Err(mserr(if owns { "no_profile" } else { "no_game" }, "profile HTTP 404"));
     }
-    r.error_for_status().map_err(e)?.json().await.map_err(e)
+    if st == 429 {
+        return Err(mserr("rate", "profile HTTP 429"));
+    }
+    if !(200..300).contains(&st) {
+        return Err(mserr("server", format!("profile HTTP {st}")));
+    }
+    r.json().await.map_err(e)
 }
 
 /// Microsoft -> Xbox Live -> XSTS -> Minecraft. Devolve (token, expira em, perfil).
@@ -159,6 +200,7 @@ async fn minecraft(ms: &str, live: bool) -> Result<(String, u64, Value), String>
         "https://user.auth.xboxlive.com/user/authenticate",
         json!({"Properties": {"AuthMethod": "RPS", "SiteName": "user.auth.xboxlive.com", "RpsTicket": format!("{}{ms}", if live { "t=" } else { "d=" })},
                "RelyingParty": "http://auth.xboxlive.com", "TokenType": "JWT"}),
+        "xbox",
     )
     .await?;
     let xt = x["Token"].as_str().ok_or("sem token Xbox")?.to_string();
@@ -166,11 +208,12 @@ async fn minecraft(ms: &str, live: bool) -> Result<(String, u64, Value), String>
         "https://xsts.auth.xboxlive.com/xsts/authorize",
         json!({"Properties": {"SandboxId": "RETAIL", "UserTokens": [xt]},
                "RelyingParty": "rp://api.minecraftservices.com/", "TokenType": "JWT"}),
+        "xsts",
     )
     .await?;
     let st = s["Token"].as_str().ok_or("sem token XSTS")?;
     let uhs = s["DisplayClaims"]["xui"][0]["uhs"].as_str().ok_or("sem uhs")?;
-    let m = post(&format!("{MC}/authentication/login_with_xbox"), json!({"identityToken": format!("XBL3.0 x={uhs};{st}")})).await?;
+    let m = post(&format!("{MC}/authentication/login_with_xbox"), json!({"identityToken": format!("XBL3.0 x={uhs};{st}")}), "minecraft").await?;
     let tok = m["access_token"].as_str().ok_or("sem token Minecraft")?.to_string();
     let exp = m["expires_in"].as_u64().unwrap_or(3600);
     let prof = get_profile(&tok).await?;
@@ -333,8 +376,8 @@ pub async fn set_cape(app: &AppHandle, cid: &str, id: Option<String>) -> Result<
 }
 
 async fn live_token(form: &[(&str, &str)]) -> Result<Value, String> {
-    let r = reqwest::Client::new().post("https://login.live.com/oauth20_token.srf").form(form).send().await.map_err(e)?;
-    r.json().await.map_err(e)
+    let r = http()?.post("https://login.live.com/oauth20_token.srf").form(form).send().await.map_err(|x| neterr("token", x))?;
+    r.json().await.map_err(|_| mserr("server", "token: resposta inválida"))
 }
 
 /// Login Microsoft por código: a interface mostra o código e o endereço (evento "ms-code") e isto espera até a pessoa entrar.
@@ -392,32 +435,32 @@ pub async fn login_web(app: &AppHandle) -> Result<Value, String> {
         .on_navigation(move |u| {
             if u.as_str().starts_with(WEB_REDIRECT) {
                 let q: std::collections::HashMap<String, String> = u.query_pairs().into_owned().collect();
-                let _ = tx.send(q.get("code").cloned().unwrap_or_else(|| "!".to_string()));
+                let _ = tx.send(q.get("code").cloned().unwrap_or_else(|| format!("!{}", q.get("error").map(String::as_str).unwrap_or("sem código"))));
                 false
             } else {
                 true
             }
         })
         .build()
-        .map_err(|_| "Não foi possível abrir a janela de entrada. Tenta outra vez.".to_string())?;
+        .map_err(|x| mserr("window", x))?;
     win.on_window_event(move |ev| {
         if let WindowEvent::Destroyed = ev {
             let _ = tx2.send(String::new());
         }
     });
-    let code = tokio::time::timeout(std::time::Duration::from_secs(600), rx.recv()).await.map_err(|_| "Tempo esgotado: tenta outra vez".to_string())?.unwrap_or_default();
-    let _ = win.close();
+    let code = tokio::time::timeout(std::time::Duration::from_secs(600), rx.recv()).await.map_err(|_| mserr("timeout", "10 min"))?.unwrap_or_default();
+    let _ = win.destroy();
     if code.is_empty() {
-        return Err("Login cancelado".to_string());
+        return Err(mserr("cancelled", ""));
     }
-    if code.starts_with('!') {
-        return Err("Não foi possível entrar com a Microsoft. Tenta outra vez.".to_string());
+    if let Some(x) = code.strip_prefix('!') {
+        return Err(if x == "access_denied" { mserr("cancelled", x) } else { mserr("denied", x) });
     }
     let t = live_token(&[("client_id", WEB_CID), ("grant_type", "authorization_code"), ("code", code.as_str()), ("redirect_uri", WEB_REDIRECT), ("scope", LIVE_SCOPE)]).await?;
     if !t["access_token"].is_string() {
-        return Err("Não foi possível entrar com a Microsoft. Tenta outra vez.".to_string());
+        return Err(mserr("token", t["error"].as_str().unwrap_or("sem access_token")));
     }
-    finish(app, t, "", true, WEB_CID).await.map_err(|_| "Não foi possível entrar com a Microsoft. Tenta outra vez.".to_string())
+    finish(app, t, "", true, WEB_CID).await
 }
 
 /// UUID das contas offline (igual ao do Minecraft: MD5 de "OfflinePlayer:nome", versão 3).
@@ -442,6 +485,21 @@ pub fn offline_login(app: &AppHandle, name: &str) -> Result<Value, String> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
+    #[test]
+    fn cada_erro_xbox_tem_o_seu_motivo() {
+        let c = |x: u64| super::xerr(&json!({"XErr": x}), 401, "xsts");
+        assert!(c(2148916233).starts_with("MSERR|no_xbox|"));
+        assert!(c(2148916238).starts_with("MSERR|child|"));
+        assert!(c(2148916235).starts_with("MSERR|region|"));
+        assert!(c(2148916229).starts_with("MSERR|restricted|"));
+        assert!(c(2148916227).starts_with("MSERR|banned|"));
+        assert!(super::xerr(&json!({"errorMessage": "Invalid app registration"}), 403, "minecraft").starts_with("MSERR|app_blocked|"));
+        assert!(super::xerr(&json!({}), 429, "minecraft").starts_with("MSERR|rate|"));
+        assert!(super::xerr(&json!({}), 500, "xbox").starts_with("MSERR|server|"));
+    }
+
     #[test]
     fn uuid_offline_igual_ao_do_minecraft() {
         assert_eq!(super::offline_uuid("Notch"), "b50ad385-829d-3141-a216-7e7d7539ba7f");

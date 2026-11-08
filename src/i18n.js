@@ -4,7 +4,103 @@
    Textos com números (ex.: "Faltam 50") usam as regras de PADRÕES mais abaixo. Para um idioma novo: nova coluna + entrada em LANGS. */
 (function(){
 const LANGS=[["en","English","🇬🇧"],["pt","Português (Portugal)","🇵🇹"],["es","Español","🇪🇸"]];
-const TABLE=`A preparar o jogo… (a primeira vez demora um pouco)|Getting the game ready… (the first time takes a while)|Preparando el juego… (la primera vez tarda un poco)
+const TABLE=`Aventura|Adventure|Aventura
+Desafiante|Challenging|Desafiante
+Combate|Combat|Combate
+Tudo e mais alguma coisa|Kitchen sink|De todo un poco
+Leve|Lightweight|Ligero
+Magia|Magic|Magia
+Multijogador|Multiplayer|Multijugador
+Otimização|Optimisation|Optimización
+Missões|Quests|Misiones
+Tecnologia|Technology|Tecnología
+Adicionar servidor|Add server|Añadir servidor
+Personaliza o launcher e o jogo. As mudanças aplicam-se logo.|Customise the launcher and the game. Changes apply instantly.|Personaliza el launcher y el juego. Los cambios se aplican al momento.
+Geral|General|General
+Jogo|Game|Juego
+O Sleep arranca escondido na bandeja quando ligas o computador.|Sleep starts hidden in the tray when you turn on the computer.|Sleep arranca oculto en la bandeja al encender el ordenador.
+Manter na bandeja ao fechar|Keep in the tray when closing|Mantener en la bandeja al cerrar
+Fechar a janela deixa o Sleep a correr, para abrir mais depressa da próxima vez.|Closing the window keeps Sleep running, so it opens faster next time.|Cerrar la ventana deja Sleep en marcha, para que abra más rápido la próxima vez.
+Animação de abertura|Opening animation|Animación de apertura
+Mostra a animação do Sleep uma vez por dia.|Shows the Sleep animation once a day.|Muestra la animación de Sleep una vez al día.
+Reduzir animações|Reduce animations|Reducir animaciones
+Desliga as transições da interface.|Turns off interface transitions.|Desactiva las transiciones de la interfaz.
+Tamanho da interface|Interface size|Tamaño de la interfaz
+Modo FPS máximo|Maximum FPS mode|Modo FPS máximo
+Desliga shaders, nuvens, sombras e VSync e tira o limite de FPS em todas as instâncias. Desligar repõe o que tinhas.|Turns off shaders, clouds, shadows and VSync and removes the FPS limit in every instance. Turning it off restores what you had.|Desactiva shaders, nubes, sombras y VSync y quita el límite de FPS en todas las instancias. Al desactivarlo se restaura lo que tenías.
+Esconder o launcher ao jogar|Hide the launcher while playing|Ocultar el launcher al jugar
+Liberta a placa gráfica enquanto jogas. O launcher volta quando fechas o jogo.|Frees the graphics card while you play. The launcher comes back when you close the game.|Libera la tarjeta gráfica mientras juegas. El launcher vuelve al cerrar el juego.
+Mods de desempenho em instâncias novas|Performance mods in new instances|Mods de rendimiento en instancias nuevas
+Liga por defeito a opção de instalar mods de FPS ao criar uma instância.|Turns on the option to install FPS mods by default when creating an instance.|Activa por defecto la opción de instalar mods de FPS al crear una instancia.
+Memória por defeito|Default memory|Memoria por defecto
+Versão|Version|Versión
+Pasta do launcher|Launcher folder|Carpeta del launcher
+Instâncias, mundos e definições.|Instances, worlds and settings.|Instancias, mundos y ajustes.
+Limpar cache|Clear cache|Limpiar caché
+Limpar|Clear|Limpiar
+Fundos das instâncias e ficheiros temporários.|Instance backgrounds and temporary files.|Fondos de las instancias y archivos temporales.
+Cache limpa.|Cache cleared.|Caché limpiada.
+Já tens a versão mais recente.|You already have the latest version.|Ya tienes la versión más reciente.
+Escolhe um modpack da Modrinth ou da CurseForge. Fica numa instância nova, pronta a jogar.|Pick a modpack from Modrinth or CurseForge. It goes into a new instance, ready to play.|Elige un modpack de Modrinth o CurseForge. Se crea una instancia nueva, lista para jugar.
+Pesquisar modpacks…|Search modpacks…|Buscar modpacks…
+Todas as versões|All versions|Todas las versiones
+Todos|All|Todos
+Carregar mais|Load more|Cargar más
+Sem resultados.|No results.|Sin resultados.
+A descarregar o modpack…|Downloading the modpack…|Descargando el modpack…
+Modpack instalado. Carrega em Jogar para instalar o jogo.|Modpack installed. Press Play to install the game.|Modpack instalado. Pulsa Jugar para instalar el juego.
+A CurseForge não está disponível nesta versão.|CurseForge is not available in this version.|CurseForge no está disponible en esta versión.
+Erro: A CurseForge não está disponível nesta versão|Error: CurseForge is not available in this version|Error: CurseForge no está disponible en esta versión
+Faltam alguns ficheiros|Some files are missing|Faltan algunos archivos
+O modpack ficou instalado, mas os autores destes ficheiros só deixam descarregar no site da CurseForge. Descarrega-os e põe-nos na pasta mods da instância.|The modpack is installed, but the authors of these files only allow downloads on the CurseForge site. Download them and put them in the instance's mods folder.|El modpack se ha instalado, pero los autores de estos archivos solo permiten descargarlos en la web de CurseForge. Descárgalos y ponlos en la carpeta mods de la instancia.
+Copiar detalhes|Copy details|Copiar detalles
+Detalhes copiados.|Details copied.|Detalles copiados.
+Esta conta ainda não tem perfil Xbox|This account has no Xbox profile yet|Esta cuenta aún no tiene perfil de Xbox
+Entra uma vez em xbox.com com esta conta, cria o teu Gamertag e volta a tentar.|Sign in once at xbox.com with this account, create your Gamertag and try again.|Entra una vez en xbox.com con esta cuenta, crea tu Gamertag e inténtalo de nuevo.
+Criar perfil Xbox|Create Xbox profile|Crear perfil de Xbox
+Conta de menor sem família Microsoft|Child account without a Microsoft family|Cuenta de menor sin familia Microsoft
+Um adulto tem de adicionar esta conta a um grupo familiar da Microsoft. Depois tenta outra vez.|An adult must add this account to a Microsoft family group. Then try again.|Un adulto debe añadir esta cuenta a un grupo familiar de Microsoft. Después inténtalo de nuevo.
+Abrir Família Microsoft|Open Microsoft Family|Abrir Familia Microsoft
+O controlo parental está a bloquear esta conta|Parental controls are blocking this account|El control parental está bloqueando esta cuenta
+Um adulto da família tem de permitir o jogo online nesta conta.|An adult in the family must allow online play on this account.|Un adulto de la familia debe permitir el juego online en esta cuenta.
+Esta conta não tem o Minecraft: Java Edition|This account doesn't have Minecraft: Java Edition|Esta cuenta no tiene Minecraft: Java Edition
+Confirma que estás a entrar com a conta Microsoft onde compraste o jogo. Sem o jogo só podes usar uma conta cracked.|Make sure you are signing in with the Microsoft account that bought the game. Without the game you can only use a cracked account.|Comprueba que entras con la cuenta Microsoft con la que compraste el juego. Sin el juego solo puedes usar una cuenta cracked.
+Abrir o site do Minecraft|Open the Minecraft site|Abrir la web de Minecraft
+Falta criar o teu nome no Minecraft|You still need to create your Minecraft name|Falta crear tu nombre en Minecraft
+Esta conta tem o jogo, mas ainda não escolheu um nome. Cria-o no site do Minecraft e volta a tentar.|This account owns the game but has not picked a name yet. Create it on the Minecraft site and try again.|Esta cuenta tiene el juego, pero aún no ha elegido un nombre. Créalo en la web de Minecraft e inténtalo de nuevo.
+Criar o nome|Create the name|Crear el nombre
+Falta aceitar os termos do Xbox|You still need to accept the Xbox terms|Falta aceptar los términos de Xbox
+Entra em xbox.com com esta conta, aceita os termos e volta a tentar.|Sign in at xbox.com with this account, accept the terms and try again.|Entra en xbox.com con esta cuenta, acepta los términos e inténtalo de nuevo.
+Abrir xbox.com|Open xbox.com|Abrir xbox.com
+O Xbox Live não está disponível no teu país|Xbox Live is not available in your country|Xbox Live no está disponible en tu país
+A Microsoft não permite entrar com esta conta a partir da região dela.|Microsoft does not allow signing in with this account from its region.|Microsoft no permite entrar con esta cuenta desde su región.
+A Microsoft pede verificação de idade|Microsoft requires age verification|Microsoft pide verificación de edad
+Conclui a verificação de adulto em xbox.com e volta a tentar.|Complete the adult verification at xbox.com and try again.|Completa la verificación de adulto en xbox.com e inténtalo de nuevo.
+Esta conta está suspensa no Xbox|This account is suspended on Xbox|Esta cuenta está suspendida en Xbox
+A Microsoft bloqueou esta conta. Só o suporte do Xbox consegue resolver isto.|Microsoft has blocked this account. Only Xbox support can solve this.|Microsoft ha bloqueado esta cuenta. Solo el soporte de Xbox puede resolverlo.
+Abrir suporte Xbox|Open Xbox support|Abrir soporte de Xbox
+Demasiadas tentativas|Too many attempts|Demasiados intentos
+A Microsoft limitou os pedidos. Espera alguns minutos e tenta outra vez.|Microsoft is limiting requests. Wait a few minutes and try again.|Microsoft ha limitado las peticiones. Espera unos minutos e inténtalo de nuevo.
+Sem ligação aos servidores da Microsoft|No connection to Microsoft's servers|Sin conexión con los servidores de Microsoft
+Verifica a internet, a VPN e o antivírus e tenta outra vez.|Check your internet, VPN and antivirus and try again.|Comprueba internet, la VPN y el antivirus e inténtalo de nuevo.
+Tempo esgotado|Timed out|Tiempo agotado
+A janela de entrada esteve aberta demasiado tempo. Tenta outra vez.|The sign-in window was open for too long. Try again.|La ventana de inicio de sesión estuvo abierta demasiado tiempo. Inténtalo de nuevo.
+Não foi possível abrir a janela de entrada|Couldn't open the sign-in window|No se pudo abrir la ventana de inicio de sesión
+Fecha o launcher, volta a abri-lo e tenta outra vez.|Close the launcher, open it again and try again.|Cierra el launcher, ábrelo de nuevo e inténtalo otra vez.
+A Microsoft recusou a entrada|Microsoft refused the sign-in|Microsoft rechazó el inicio de sesión
+Tenta outra vez e confirma a conta e a palavra-passe.|Try again and check your account and password.|Inténtalo de nuevo y comprueba la cuenta y la contraseña.
+A Microsoft não concluiu a entrada|Microsoft didn't finish the sign-in|Microsoft no completó el inicio de sesión
+Tenta outra vez. Se continuar, envia os detalhes abaixo.|Try again. If it keeps happening, send the details below.|Inténtalo de nuevo. Si continúa, envía los detalles de abajo.
+A Microsoft recusou o launcher|Microsoft refused the launcher|Microsoft rechazó el launcher
+O problema está do lado do launcher, não da tua conta. Envia os detalhes abaixo ao criador do Sleep.|The problem is on the launcher's side, not your account. Send the details below to the creator of Sleep.|El problema está en el launcher, no en tu cuenta. Envía los detalles de abajo al creador de Sleep.
+Os servidores responderam com um erro|The servers answered with an error|Los servidores respondieron con un error
+Pode ser uma falha temporária. Tenta outra vez e, se continuar, envia os detalhes abaixo.|It may be a temporary failure. Try again and, if it continues, send the details below.|Puede ser un fallo temporal. Inténtalo de nuevo y, si continúa, envía los detalles de abajo.
+A atualização não ficou instalada|The update was not installed|La actualización no se instaló
+Continuar|Continue|Continuar
+Move o Sleep Launcher para a pasta Aplicações|Move Sleep Launcher to the Applications folder|Mueve Sleep Launcher a la carpeta Aplicaciones
+O macOS não deixa atualizar uma app aberta a partir do disco de instalação ou dos Downloads. Fecha o Sleep, arrasta-o para Aplicações e abre-o de lá.|macOS doesn't allow updating an app opened from the install disk or Downloads. Close Sleep, drag it to Applications and open it from there.|macOS no permite actualizar una app abierta desde el disco de instalación o Descargas. Cierra Sleep, arrástralo a Aplicaciones y ábrelo desde allí.
+O servidor de amigos recusou a ligação. Tenta mais tarde.|The friends server refused the connection. Try again later.|El servidor de amigos rechazó la conexión. Inténtalo más tarde.
+A preparar o jogo… (a primeira vez demora um pouco)|Getting the game ready… (the first time takes a while)|Preparando el juego… (la primera vez tarda un poco)
 A Mojang limitou os pedidos de capa. Espera cerca de 1 minuto e tenta outra vez.|Mojang is limiting cape requests. Wait about a minute and try again.|Mojang limitó las peticiones de capa. Espera un minuto e inténtalo de nuevo.
 Fundo da página inicial|Home page background|Fondo de la página de inicio
 Cena 3D que aparece atrás do teu boneco. Automático: Natal de 1 de novembro a 31 de dezembro, o resto do ano a cena normal.|3D scene shown behind your character. Automatic: Christmas from 1 November to 31 December, the normal scene the rest of the year.|Escena 3D que aparece detrás de tu personaje. Automático: Navidad del 1 de noviembre al 31 de diciembre, el resto del año la escena normal.
@@ -171,7 +267,6 @@ Repor a fonte|Reset the font|Restablecer la fuente
 Abrir com o computador|Open with the computer|Abrir con el ordenador
 Avançado|Advanced|Avanzado
 Login Microsoft|Microsoft login|Inicio de sesión de Microsoft
-Application (client) ID da tua app no Azure|Application (client) ID of your Azure app|Application (client) ID de tu app en Azure
 Guardar|Save|Guardar
 Chave guardada neste computador. Cola outra para a trocar.|Key saved on this computer. Paste another to replace it.|Clave guardada en este ordenador. Pega otra para cambiarla.
 Chave de API da CurseForge (console.curseforge.com). Fica só neste computador.|CurseForge API key (console.curseforge.com). It stays on this computer only.|Clave de API de CurseForge (console.curseforge.com). Se queda solo en este ordenador.
@@ -359,6 +454,11 @@ const PATS=[
  [/^(.+) · escolhe a versão$/,"$1 · pick the version","$1 · elige la versión"],
  [/^(.+?) · (\d+) MB$/,"$1 · $2 MB","$1 · $2 MB"],
  [/^Mandei (\d+) pastas? para o Lixo\.$/,"Moved $1 folder(s) to the Trash.","Moví $1 carpeta(s) a la papelera."],
+ [/^Automático usa (.+) neste computador\.$/,"Automatic uses $1 on this computer.","Automático usa $1 en este ordenador."],
+ [/^Para as instâncias sem memória própria\. Automático usa (.+) neste computador\.$/,"For instances without their own memory. Automatic uses $1 on this computer.","Para las instancias sin memoria propia. Automático usa $1 en este ordenador."],
+ [/^Podes libertar (.+)\.$/,"You can free $1.","Puedes liberar $1."],
+ [/^Continuas na versão (.*)\. Descarrega o instalador da versão (.*) e instala-o por cima\.$/,"You are still on version $1. Download the installer for version $2 and install it over this one.","Sigues en la versión $1. Descarga el instalador de la versión $2 e instálalo encima."],
+ [/^Sleep Launcher v(.+)$/,"Sleep Launcher v$1","Sleep Launcher v$1"],
  [/^Importei (\d+) instâncias?\..*$/,"Imported $1 instance(s). The game installs when you press Play.","Importé $1 instancia(s). El juego se instala al pulsar Jugar."],
  [/^A criar (.+)…$/,"Creating $1…","Creando $1…"],
  [/^A otimizar (.+): (.+)…$/,"Optimising $1: $2…","Optimizando $1: $2…"],
@@ -378,6 +478,7 @@ const PATS=[
  [/^Skin atualizada\.$/,"Skin updated.","Skin actualizada."],
  [/^Abre (.+) e escreve este código:$/,"Open $1 and type this code:","Abre $1 y escribe este código:"]
 ];
+/* a verdade está em settings.json (ver KL.init no arranque); isto é só o valor provisório até o Rust responder */
 let lang="en";try{lang=localStorage.getItem("kubo.lang")||"en"}catch(e){}
 const ORIG=new WeakMap(),LAST=new WeakMap();
 function tr(s){if(lang=="pt"||!s)return s;const d=lang=="es"?ES:EN,m=s.match(/^(\s*)([\s\S]*?)(\s*)$/),k=m?m[2]:s;if(!k)return s;
@@ -393,7 +494,10 @@ let busy=false;
 const mo=new MutationObserver(ms=>{if(busy)return;busy=true;try{for(const m of ms){if(m.type=="childList")m.addedNodes.forEach(node);else if(m.type=="characterData")node(m.target);else if(m.type=="attributes")node(m.target)}}finally{busy=false}});
 function start(){mo.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:["placeholder","title","aria-label"]});node(document.body)}
 window.KL={langs:LANGS,get:()=>lang,t:tr,
- set(c){lang=c;try{localStorage.setItem("kubo.lang",c)}catch(e){}document.documentElement.lang=c;busy=true;try{node(document.body)}finally{busy=false}if(window.render)render()}};
+ /* escolhido pela pessoa: guarda no ficheiro de definições, que sobrevive ao fechar a app e não depende do espaço do localStorage */
+ set(c){apply(c);const A=window.__TAURI__;if(A)A.core.invoke("save_pref",{key:"lang",value:c}).catch(()=>{});if(window.render)render()},
+ init(c){if(c!=lang)apply(c)}};
+function apply(c){lang=c;try{localStorage.setItem("kubo.lang",c)}catch(e){}document.documentElement.lang=c;busy=true;try{node(document.body)}finally{busy=false}}
 document.documentElement.lang=lang;
 if(document.readyState=="loading")document.addEventListener("DOMContentLoaded",start);else start();
 })();

@@ -15,7 +15,7 @@ Se não compilar: `cd src-tauri && cargo check` e manda os erros a uma AI.
 - `src-tauri/src/modrinth.rs` e `curseforge.rs`: pesquisa e instalação de mods, packs e shaders
 
 ## CurseForge
-Cria uma chave grátis em console.curseforge.com e cola-a em Definições. Não a metas no código nem num zip que partilhes.
+A chave vem do ficheiro `.cf_key` na raiz do projeto (fora do git) ou do segredo `KUBO_CF_KEY` no CI. Vai baralhada dentro da app, mas quem quiser muito consegue extraí-la: a proteção a sério seria um servidor intermédio. Nunca aparece na interface.
 - `src-tauri/src/mojang.rs`: versões e downloads
 - `src-tauri/src/launch.rs`: comando de arranque do jogo
 - `src-tauri/src/main.rs`: comandos Tauri e instâncias
@@ -25,10 +25,8 @@ Cria uma chave grátis em console.curseforge.com e cola-a em Definições. Não 
 - Linux: a bandeja precisa de libayatana-appindicator (ex: `sudo apt install libayatana-appindicator3-dev`)
 - Definições (tema, última instalação, manifesto) ficam em settings.json na pasta de dados da app
 
-## Login Microsoft (passo 5)
-1. Azure: a tua app tem de ter, em Autenticação, a plataforma "Aplicações móveis e de ambiente de trabalho" com o URI `https://login.microsoftonline.com/common/oauth2/nativeclient`, e "Permitir fluxos de clientes públicos" ligado.
-2. O client ID está em Definições (já vem preenchido). Confirma que é igual ao do Azure.
-3. Só funciona de verdade depois de a Mojang aprovar o client ID (aka.ms/mce-reviewappid). Até lá aparece a mensagem de app não aprovada e o jogo corre offline.
+## Login Microsoft
+O login usa a janela da Microsoft com o client ID público do Minecraft: não precisa de configuração no Azure. Cada falha mostra o motivo real (sem perfil Xbox, conta de menor, sem o jogo, etc.) e os detalhes técnicos para copiar.
 
 ## Amigos e chat (passo 9A)
 - Usa o mesmo backend e o mesmo login do mod do client: o launcher envia o token Minecraft a /auth/minecraft (HTTPS, só para o endereço fixo em `src-tauri/src/social.rs`). Quem controla esse backend consegue ver o token, por isso só aponta o launcher para um servidor teu.
@@ -64,4 +62,5 @@ Cria uma chave grátis em console.curseforge.com e cola-a em Definições. Não 
 3. O separador **Actions** compila sozinho. Demora uns 10 a 20 minutos na primeira vez.
 4. Os instaladores ficam em **Releases** (`.msi` e `.exe` no Windows, `.dmg` no Mac, `.deb`, `.rpm` e `.AppImage` no Linux).
 - Para uma versão nova, muda `version` em `src-tauri/tauri.conf.json` e faz push: cria uma release nova.
+- Antes de lançar: muda a versão em `tauri.conf.json`, `Cargo.toml` e `package.json` e usa a etiqueta `v` igual (o CI recusa se não coincidirem). No site liga só ao `.exe` no Windows.
 - As apps não são assinadas: o Windows mostra o SmartScreen ("Mais informações > Executar mesmo assim") e no Mac é preciso clicar com o botão direito > Abrir.

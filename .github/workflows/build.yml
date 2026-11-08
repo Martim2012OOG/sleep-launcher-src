@@ -2,6 +2,7 @@ name: Release Sleep Launcher
 
 # Para lançar uma versão: muda "version" em src-tauri/tauri.conf.json e src-tauri/Cargo.toml, faz commit e
 #   git tag v0.2.0 && git push --tags
+# No Windows só sai o instalador .exe (NSIS): com .msi e .exe ao mesmo tempo havia duas instalações em pastas diferentes e o atalho ficava na antiga.
 # Compila Windows, macOS (Apple Silicon + Intel) e Linux, assina as atualizações (updater) e publica tudo na Release,
 # As mods do Sleep NÃO passam por aqui: o CI do client publica-as sozinho (ver mods.yml).
 on:
@@ -17,6 +18,17 @@ jobs:
     # a release vive no repositório PÚBLICO de downloads: cria-se lá primeiro (etiqueta no commit dele), os builds só juntam ficheiros
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v4
+      # se a etiqueta e as versões não baterem certo, os amigos "atualizam" e ficam na mesma: melhor falhar aqui
+      - name: Confirmar que as versões coincidem
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          T="${GITHUB_REF_NAME#v}"
+          C=$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
+          G=$(python3 -c "import re;print(re.search(r'^version = \"(.+?)\"',open('src-tauri/Cargo.toml').read(),re.M).group(1))")
+          echo "etiqueta=$T tauri.conf=$C Cargo.toml=$G"
+          test "$T" = "$C" && test "$T" = "$G"
+
       - name: Criar a release no repositório público
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
