@@ -123,3 +123,9 @@
 10. (feito) Grupos, reações, notificações, convidar para o servidor onde estás. Emotes ficaram de fora
 11. (feito) Loja, capas e skins Kubo. Skins da comunidade ficaram de fora (sem endpoint)
 12. A decidir: mudar nome e apagar grupo, emotes, recolher a recompensa diária se o site a expuser, compilar e corrigir o Rust (passos 2 a 11)
+
+## 0.1.16: modpacks a crashar (corrigido)
+- Forge/NeoForge 1.17+: o perfil ignora "${version_name}.jar" do classpath. O launcher punha lá o jar vanilla ("1.20.1.jar"), que não era ignorado, e o jogo crashava ao arrancar. Agora o jar do cliente fica em versions/<perfil>/<perfil>.jar, como no launcher oficial (loaders::own_jar). As instâncias já instaladas consertam-se sozinhas ao carregar em Jogar (loaders::repair)
+- Modpacks NeoForge do 1.20.1: o instalador vem de net/neoforged/forge/1.20.1-<versão> (antes dava 404)
+- Modpacks Fabric/Quilt: se o pack fixa um loader mais antigo do que o estável atual, usa-se o estável (o Sleep e mods recentes pedem loader novo)
+- Rust verificado com cargo check; NÃO testado dentro do jogo

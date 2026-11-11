@@ -38,7 +38,10 @@ pub fn pick_neo(all: &[String], prefix: &str) -> Option<String> {
 /// (url do instalador, versão do loader, nome para mostrar)
 async fn resolve(mc: &str, neo: bool, fixed: Option<&str>) -> Result<(String, String, &'static str), String> {
     if let Some(v) = fixed {
-        return Ok(if neo {
+        return Ok(if neo && mc == "1.20.1" {
+            // no 1.20.1 o NeoForge ainda se chamava "forge" e a versão leva o Minecraft à frente
+            (format!("https://maven.neoforged.net/releases/net/neoforged/forge/{mc}-{v}/forge-{mc}-{v}-installer.jar"), v.to_string(), "NeoForge")
+        } else if neo {
             (format!("https://maven.neoforged.net/releases/net/neoforged/neoforge/{v}/neoforge-{v}-installer.jar"), v.to_string(), "NeoForge")
         } else {
             (format!("https://maven.minecraftforge.net/net/minecraftforge/forge/{mc}-{v}/forge-{mc}-{v}-installer.jar"), v.to_string(), "Forge")
@@ -82,6 +85,44 @@ fn find_profile(shared: &Path, mc: &str, lv: &str) -> Option<(String, Value)> {
         }
     }
     None
+}
+
+/// O Forge/NeoForge (1.17+) tira do classpath o ficheiro "${version_name}.jar" (-DignoreList) para carregar ele próprio o jogo.
+/// Por isso o jar do cliente tem de ter o nome do perfil, como faz o launcher oficial: com o nome vanilla ("1.20.1.jar")
+/// não era ignorado, o jogo ficava carregado duas vezes e crashava logo ao arrancar.
+/// Deixa versions/<id>/<id>.jar (cópia do vanilla) e aponta o perfil para ele. Devolve true se mudou o json.
+pub fn own_jar(shared: &Path, id: &str, mc: &str, vj: &mut Value) -> Result<bool, String> {
+    let dst = shared.join("versions").join(id).join(format!("{id}.jar"));
+    if !dst.exists() {
+        let src = shared.join("versions").join(mc).join(format!("{mc}.jar"));
+        if let Some(d) = dst.parent() {
+            std::fs::create_dir_all(d).map_err(e)?;
+        }
+        // ligação no disco (não gasta espaço); se o sistema não deixar, copia
+        if std::fs::hard_link(&src, &dst).is_err() {
+            let tmp = dst.with_extension("part");
+            std::fs::copy(&src, &tmp).map_err(|x| format!("não consegui copiar o jar do jogo: {x}"))?;
+            std::fs::rename(&tmp, &dst).map_err(e)?;
+        }
+    }
+    if vj["jar"].as_str() == Some(id) {
+        return Ok(false);
+    }
+    vj["jar"] = json!(id);
+    Ok(true)
+}
+
+/// Repara um perfil Forge/NeoForge instalado por uma versão antiga do launcher (jar com o nome vanilla).
+pub fn repair(shared: &Path, id: &str, mc: &str) -> Result<(), String> {
+    let p = shared.join("versions").join(id).join(format!("{id}.json"));
+    let Ok(raw) = std::fs::read(&p) else { return Ok(()) };
+    let mut vj: Value = serde_json::from_slice(&raw).map_err(e)?;
+    if own_jar(shared, id, mc, &mut vj)? {
+        let tmp = p.with_extension("part");
+        std::fs::write(&tmp, serde_json::to_vec(&vj).map_err(e)?).map_err(e)?;
+        std::fs::rename(&tmp, &p).map_err(e)?;
+    }
+    Ok(())
 }
 
 fn hide(c: &mut std::process::Command) {

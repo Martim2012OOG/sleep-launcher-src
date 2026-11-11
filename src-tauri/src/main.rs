@@ -668,7 +668,9 @@ async fn install_instance(app: AppHandle, name: String) -> Result<(), String> {
             mojang::install(&app, &shared, &mc, &parent).await?;
             let major = parent["javaVersion"]["majorVersion"].as_u64().unwrap_or(8);
             let (id, child) = loaders::install(&app, &root(&app)?, &shared, &mc, loader == "neoforge", major, lv.as_deref()).await?;
-            (id, fabric::merge(&parent, &child, &mc))
+            let mut vj = fabric::merge(&parent, &child, &mc);
+            loaders::own_jar(&shared, &id, &mc, &mut vj)?;
+            (id, vj)
         }
         _ => (mc.clone(), parent),
     };
@@ -773,6 +775,10 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
         ram_max,
         jvm: inst["jvm_args"].as_str().unwrap_or("").split_whitespace().map(String::from).collect(),
     };
+    if matches!(inst["loader"].as_str(), Some("forge") | Some("neoforge")) && id != mc {
+        // instâncias instaladas antes desta correção crashavam ao arrancar: conserta sem reinstalar
+        loaders::repair(&shared, &id, &mc)?;
+    }
     let (mut args, major) = launch::build(&shared, &game, &id, &user, &uuid, &tk, &opts)?;
     let (w, h) = (inst["width"].as_u64().unwrap_or(0), inst["height"].as_u64().unwrap_or(0));
     if w > 0 && h > 0 {
