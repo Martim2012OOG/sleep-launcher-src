@@ -129,3 +129,9 @@
 - Modpacks NeoForge do 1.20.1: o instalador vem de net/neoforged/forge/1.20.1-<versão> (antes dava 404)
 - Modpacks Fabric/Quilt: se o pack fixa um loader mais antigo do que o estável atual, usa-se o estável (o Sleep e mods recentes pedem loader novo)
 - Rust verificado com cargo check; NÃO testado dentro do jogo
+
+## 0.1.17: Jogar mais rápido
+- Versões do jogo sem Sleep (muitos modpacks): já não vão ao manifesto em todos os arranques (.synced também se escreve nesse caso; mods::is_fresh aceita-o). Antes podiam esperar até 45 s
+- sync_mods: as duas verificações (Sleep e mods de FPS) correm ao mesmo tempo, com 4 s no máximo quando o Sleep já está no disco (antes 5 s + 5 s seguidos)
+- prefetch_mods nunca era chamado pela interface. Agora corre sozinho 3 s depois de abrir e de 20 em 20 minutos (o launcher fica dias na bandeja), e também renova a sessão Microsoft 2 h antes de expirar (auth::keep_fresh), para Jogar não esperar por Microsoft → Xbox → XSTS → Minecraft
+- O tempo que o próprio Minecraft demora a carregar (Java, mods, recursos) não muda com isto

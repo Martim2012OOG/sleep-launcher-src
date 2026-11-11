@@ -839,14 +839,21 @@ fn manifest_url() -> String {
 async fn sync_mods(app: &AppHandle, mc: &str, hidden: &Path, game: &Path) -> Result<String, String> {
     let url = manifest_url();
     let have = mods::is_ready(hidden, mc);
-    let res = if have {
-        tokio::time::timeout(std::time::Duration::from_secs(5), mods::sync(app, &url, mc, hidden)).await.unwrap_or_else(|_| Ok(String::new()))
-    } else {
-        mods::sync(app, &url, mc, hidden).await
-    };
-    let d = std::time::Duration::from_secs(if have { 5 } else { 45 });
+    // com o Sleep já no disco (ou numa versão que não o tem) espera-se no máximo 4 s pela rede; as duas verificações correm ao mesmo tempo
+    let quick = have || mods::known_without_sleep(hidden);
+    let d = std::time::Duration::from_secs(if quick { 4 } else { 45 });
     let fps_on = settings(app)["fps_boost"].as_bool().unwrap_or(false);
-    let fps = tokio::time::timeout(d, mods::sync_perf(&url, mc, hidden, &game.join("mods"), fps_on)).await;
+    let gm = game.join("mods");
+    let (res, fps) = tokio::join!(
+        async {
+            if quick {
+                tokio::time::timeout(d, mods::sync(app, &url, mc, hidden)).await.unwrap_or_else(|_| Ok(String::new()))
+            } else {
+                mods::sync(app, &url, mc, hidden).await
+            }
+        },
+        tokio::time::timeout(d, mods::sync_perf(&url, mc, hidden, &gm, fps_on))
+    );
     let mut note = String::new();
     if !have {
         if let Ok(Err(x)) = fps {
@@ -868,6 +875,8 @@ async fn sync_mods(app: &AppHandle, mc: &str, hidden: &Path, game: &Path) -> Res
 /// Ao abrir o launcher, deixa as mods da última instância em dia em segundo plano: assim carregar em Jogar não precisa de esperar pela rede.
 #[tauri::command]
 async fn prefetch_mods(app: AppHandle) -> Result<(), String> {
+    // a sessão Microsoft também fica renovada de antemão
+    auth::keep_fresh(&app, &cid(&app)).await;
     if !console::running().is_empty() {
         return Ok(());
     }
@@ -1168,6 +1177,15 @@ fn main() {
                 tray = tray.icon(i.clone());
             }
             tray.build(app)?;
+            // o launcher pode ficar dias aberto na bandeja: de 20 em 20 minutos deixa a sessão e as mods em dia, para Jogar arrancar logo
+            let bg = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                loop {
+                    let _ = prefetch_mods(bg.clone()).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(20 * 60)).await;
+                }
+            });
             // arrancou com o computador: fica escondido na bandeja
             if std::env::args().any(|a| a == "--hidden") {
                 if let Some(w) = app.get_webview_window("main") {

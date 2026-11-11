@@ -72,7 +72,8 @@ pub fn known_without_sleep(mods: &Path) -> bool {
 /// As mods desta versão foram verificadas há menos de 6 horas e está lá tudo? Então Jogar não precisa de ir à rede.
 pub fn is_fresh(mods: &Path, mc: &str) -> bool {
     let recent = std::fs::metadata(mods.join(".synced")).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|d| d.as_secs() < 6 * 3600);
-    recent && is_ready(mods, mc)
+    // numa versão do jogo sem Sleep (muitos modpacks) não há nada para ter no disco: antes isto ia à rede em todos os arranques
+    recent && (is_ready(mods, mc) || known_without_sleep(mods))
 }
 
 /// Descarrega para `.part`, continuando do ponto onde ficou. Só falha se a ligação parar 60 s seguidos: ligações lentas chegam ao fim.
@@ -187,10 +188,8 @@ pub async fn sync(app: &AppHandle, url: &str, mc: &str, mods: &Path) -> Result<S
     if offered && !has_main(mods, mc) {
         return Err("SHA1".to_string());
     }
-    // só chega aqui com todos os jars do manifesto no disco e verificados
-    if offered {
-        let _ = std::fs::write(mods.join(".synced"), b"");
-    }
+    // só chega aqui com todos os jars do manifesto no disco e verificados (ou sabendo que esta versão não tem Sleep)
+    let _ = std::fs::write(mods.join(".synced"), b"");
     if n > 0 {
         let _ = app.emit("progress", json!({"stage": "Sleep", "done": 1, "total": 1}));
     }

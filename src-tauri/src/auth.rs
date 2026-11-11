@@ -314,11 +314,30 @@ fn trip(a: &Value) -> Option<(String, String, String)> {
 
 /// (nome, uuid, token) válidos; renova com o refresh token se o token do Minecraft expirou.
 pub async fn session(app: &AppHandle, cid: &str) -> Option<(String, String, String)> {
+    session_within(app, cid, 0).await
+}
+
+/// Renova a sessão em segundo plano quando faltam menos de 2 horas para expirar: assim Jogar nunca fica à espera da Microsoft.
+pub async fn keep_fresh(app: &AppHandle, cid: &str) {
+    let _ = session_within(app, cid, 7200).await;
+}
+
+/// Só uma renovação de cada vez (a de Jogar e a de segundo plano usavam o mesmo refresh token).
+static REFRESH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Como `session`, mas renova já se o token expirar dentro de `margin` segundos.
+async fn session_within(app: &AppHandle, cid: &str, margin: u64) -> Option<(String, String, String)> {
     let a = load(app)?;
     if a["offline"].as_bool() == Some(true) {
         return Some((a["name"].as_str()?.to_string(), a["uuid"].as_str()?.to_string(), "0".to_string()));
     }
-    if a["expires"].as_u64().unwrap_or(0) > now() {
+    if a["expires"].as_u64().unwrap_or(0) > now() + margin {
+        return trip(&a);
+    }
+    let _g = REFRESH_LOCK.lock().await;
+    // outra renovação pode ter acabado enquanto esta esperava
+    let a = load(app)?;
+    if a["expires"].as_u64().unwrap_or(0) > now() + margin {
         return trip(&a);
     }
     let r = a["refresh"].as_str()?.to_string();
