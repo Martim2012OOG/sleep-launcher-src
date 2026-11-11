@@ -23,8 +23,6 @@ pub struct Opts {
     pub ram_min: u64,
     pub ram_max: u64,
     pub jvm: Vec<String>,
-    /// Pasta da cache de classes do Java (arranques seguintes mais rápidos).
-    pub cds_dir: std::path::PathBuf,
 }
 
 /// Devolve (argumentos, versão de Java necessária).
@@ -85,11 +83,6 @@ pub fn build(root: &Path, game: &Path, id: &str, user: &str, uuid: &str, token: 
         for f in ["-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled", "-XX:MaxGCPauseMillis=200", "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC", "-XX:G1NewSizePercent=30", "-XX:G1MaxNewSizePercent=40", "-XX:G1HeapRegionSize=8M", "-XX:G1ReservePercent=20", "-XX:G1HeapWastePercent=5", "-XX:G1MixedGCCountTarget=4", "-XX:InitiatingHeapOccupancyPercent=15", "-XX:G1MixedGCLiveThresholdPercent=90", "-XX:G1RSetUpdatingPauseTimePercent=5", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem", "-XX:MaxTenuringThreshold=1"] {
             args.push(f.to_string());
         }
-    }
-    // o Java 19+ guarda as classes já carregadas e reutiliza-as no arranque seguinte
-    if o.jvm.is_empty() && major >= 19 && std::fs::create_dir_all(&o.cds_dir).is_ok() {
-        args.push("-XX:+AutoCreateSharedArchive".to_string());
-        args.push(format!("-XX:SharedArchiveFile={}", o.cds_dir.join(format!("{id}-{major}.jsa")).display()));
     }
     args.extend(o.jvm.iter().cloned());
     args.extend(jvm.iter().map(|s| sub(s)));

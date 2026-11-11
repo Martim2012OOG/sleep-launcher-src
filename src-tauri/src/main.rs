@@ -766,14 +766,12 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
     let prefs = settings(&app);
     let total = perf::total_ram_mb();
     let ram_max = Some(inst["ram_max"].as_u64().unwrap_or(0)).filter(|m| *m > 0).or(prefs["default_ram"].as_u64().filter(|m| *m > 0)).unwrap_or_else(|| perf::auto_ram(total));
-    // com memória de sobra a pilha nasce logo com o tamanho final (o Java não perde tempo a aumentá-la a meio do jogo)
-    let ram_min = Some(inst["ram_min"].as_u64().unwrap_or(0)).filter(|m| *m > 0).unwrap_or(if total >= 12288 { ram_max } else { 0 });
+    let ram_min = inst["ram_min"].as_u64().unwrap_or(0);
     perf::apply_fps_mode(&game, prefs["fps_mode"].as_bool().unwrap_or(false));
     let opts = launch::Opts {
         ram_min,
         ram_max,
         jvm: inst["jvm_args"].as_str().unwrap_or("").split_whitespace().map(String::from).collect(),
-        cds_dir: shared.join("cds"),
     };
     let (mut args, major) = launch::build(&shared, &game, &id, &user, &uuid, &tk, &opts)?;
     let (w, h) = (inst["width"].as_u64().unwrap_or(0), inst["height"].as_u64().unwrap_or(0));
@@ -797,11 +795,13 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
         // a mod do Sleep é uma mod Fabric (o Quilt também a carrega)
         // fica escondida na pasta de dados do launcher (nunca em game/mods) e o Fabric Loader vai buscá-la por -Dfabric.addMods
         let hidden = root(&app)?.join("kubo-mods").join(&mc);
-        if !mods::is_fresh(&hidden) {
-            note = sync_mods(&app, &mc, &hidden, &game, !mods::jar_list(&hidden).is_empty()).await;
+        if !mods::is_fresh(&hidden, &mc) {
+            note = sync_mods(&app, &mc, &hidden, &game).await?;
         }
         mods::purge_visible(&game.join("mods"));
-        let list = mods::jar_list(&hidden);
+        mods::purge_bundled(&hidden);
+        // sem o jar principal nenhuma das outras entra: as extensões dependem dele e o jogo crashava
+        let list = if mods::has_main(&hidden, &mc) { mods::jar_list(&hidden) } else { String::new() };
         if !list.is_empty() {
             args.insert(0, format!("-Dfabric.addMods={list}"));
             args.insert(1, format!("-Dloader.addMods={list}"));
@@ -812,8 +812,7 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        // sem consola e com prioridade acima do normal
-        c.creation_flags(0x08000000 | 0x00008000);
+        c.creation_flags(0x08000000);
     }
     console::start(&app, &clean(&name), c)?;
     let _ = patch(&app, "last", inst["name"].clone());
@@ -829,23 +828,35 @@ fn manifest_url() -> String {
     default_manifest()
 }
 
-/// Atualiza as mods escondidas. Com mods já no disco nunca faz esperar mais do que uns segundos: joga-se com as que há e o resto fica para a próxima.
-async fn sync_mods(app: &AppHandle, mc: &str, hidden: &Path, game: &Path, have: bool) -> String {
+/// Atualiza as mods escondidas. Com o jar principal no disco nunca faz esperar mais do que uns segundos: joga-se com o que há e o resto continua depois.
+/// Sem ele, espera o download inteiro (com progresso) e, se não der, não deixa jogar.
+async fn sync_mods(app: &AppHandle, mc: &str, hidden: &Path, game: &Path) -> Result<String, String> {
     let url = manifest_url();
-    let d = std::time::Duration::from_secs(if have { 5 } else { 45 });
-    let mut note = match tokio::time::timeout(d, mods::sync(&url, mc, hidden)).await {
-        Ok(Ok(_)) => String::new(),
-        Ok(Err(x)) if !have => format!("mods: {x}"),
-        Err(_) if !have => "mods: sem resposta".to_string(),
-        _ => String::new(),
+    let have = mods::is_ready(hidden, mc);
+    let res = if have {
+        tokio::time::timeout(std::time::Duration::from_secs(5), mods::sync(app, &url, mc, hidden)).await.unwrap_or_else(|_| Ok(String::new()))
+    } else {
+        mods::sync(app, &url, mc, hidden).await
     };
+    let d = std::time::Duration::from_secs(if have { 5 } else { 45 });
     let fps_on = settings(app)["fps_boost"].as_bool().unwrap_or(false);
-    if let Ok(Err(x)) = tokio::time::timeout(d, mods::sync_perf(&url, mc, hidden, &game.join("mods"), fps_on)).await {
-        if !have {
-            note = format!("{note} · fps: {x}");
+    let fps = tokio::time::timeout(d, mods::sync_perf(&url, mc, hidden, &game.join("mods"), fps_on)).await;
+    let mut note = String::new();
+    if !have {
+        if let Ok(Err(x)) = fps {
+            note = format!("fps: {x}");
         }
     }
-    note
+    if mods::is_ready(hidden, mc) {
+        return Ok(note);
+    }
+    match res {
+        // o manifesto foi lido até ao fim e não falta nada do que ele oferece (esta versão do jogo não tem Sleep)
+        Ok(_) => Ok(note),
+        // sem internet, numa versão que da última vez já se sabia não ter Sleep
+        Err(x) if x.starts_with("MANIFEST:") && mods::known_without_sleep(hidden) => Ok(format!("mods: {}", x.trim_start_matches("MANIFEST:"))),
+        Err(x) => Err(format!("Não foi possível descarregar o Sleep ({}). Verifica a internet e carrega em Jogar outra vez.", x.trim_start_matches("MANIFEST:"))),
+    }
 }
 
 /// Ao abrir o launcher, deixa as mods da última instância em dia em segundo plano: assim carregar em Jogar não precisa de esperar pela rede.
@@ -865,8 +876,8 @@ async fn prefetch_mods(app: AppHandle) -> Result<(), String> {
     }
     let mc = inst["version"].as_str().unwrap_or("").to_string();
     let hidden = root(&app)?.join("kubo-mods").join(&mc);
-    if !mods::is_fresh(&hidden) {
-        let _ = tokio::time::timeout(std::time::Duration::from_secs(120), mods::sync(&manifest_url(), &mc, &hidden)).await;
+    if !mods::is_fresh(&hidden, &mc) {
+        let _ = mods::sync(&app, &manifest_url(), &mc, &hidden).await;
     }
     Ok(())
 }

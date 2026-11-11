@@ -83,6 +83,21 @@ pub fn start(app: &AppHandle, name: &str, mut cmd: Command) -> Result<(), String
         g.insert(name.to_string(), game);
     }
     let readers: Vec<_> = [out.map(|o| pump(name.to_string(), session, o)), err.map(|e| pump(name.to_string(), session, e))].into_iter().flatten().collect();
+    // se o jogo ficar calado, a consola explica o que se passa em vez de parecer parada
+    let (quiet_name, quiet_session) = (name.to_string(), session);
+    std::thread::spawn(move || {
+        for (wait, seen, msg) in [
+            (30u64, 1u64, "[Sleep] Ainda a carregar. Com muitos mods, o Minecraft pode demorar 1 ou 2 minutos a escrever a primeira linha aqui, sobretudo com antivírus."),
+            (150u64, 2u64, "[Sleep] Isto está a demorar demasiado. Vê se apareceu uma janela de erro ou se o antivírus bloqueou o Java. Se continuar, carrega em Parar o jogo e manda o que estiver no separador Logs."),
+        ] {
+            std::thread::sleep(Duration::from_secs(wait));
+            let silent = games().get(&quiet_name).is_some_and(|g| g.session == quiet_session && g.running && g.total <= seen);
+            if !silent {
+                return;
+            }
+            push(&quiet_name, quiet_session, msg.to_string());
+        }
+    });
     let _ = app.emit("game-state", json!({"name": name, "running": true, "code": Value::Null}));
     let (app, name) = (app.clone(), name.to_string());
     std::thread::spawn(move || {

@@ -1,6 +1,16 @@
 use crate::mojang::fetch_json;
+use serde_json::json;
 use sha1::{Digest, Sha1};
 use std::path::Path;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter};
+
+/// Id da mod principal no manifesto. As extensões dependem dela: sem este jar o jogo não pode arrancar com elas.
+const MAIN_ID: &str = "kubo";
+/// Já vêm dentro do jar principal: não se descarregam à parte e as cópias soltas apagam-se.
+const BUNDLED: &[&str] = &["kubo-combat"];
+/// Só um download de cada vez (o de Jogar e o que corre ao abrir o launcher escreviam no mesmo ficheiro).
+static SYNC_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn e<E: std::fmt::Display>(x: E) -> String {
     x.to_string()
@@ -10,6 +20,33 @@ fn hex(b: &[u8]) -> String {
     format!("{:x}", Sha1::digest(b))
 }
 
+/// SHA1 de um ficheiro, lido aos bocados (o jar principal tem mais de 100 MB).
+fn hex_file(p: &Path) -> Option<String> {
+    use std::io::Read;
+    let mut f = std::fs::File::open(p).ok()?;
+    let mut h = Sha1::new();
+    let mut b = vec![0u8; 1 << 20];
+    loop {
+        let n = f.read(&mut b).ok()?;
+        if n == 0 {
+            break;
+        }
+        h.update(&b[..n]);
+    }
+    Some(format!("{:x}", h.finalize()))
+}
+
+/// Apaga as cópias soltas das extensões que já vêm dentro do jar principal.
+pub fn purge_bundled(mods: &Path) {
+    let Ok(rd) = std::fs::read_dir(mods) else { return };
+    for en in rd.flatten() {
+        let n = en.file_name().to_string_lossy().to_string();
+        if BUNDLED.iter().any(|id| n.starts_with(&format!("{id}-"))) && (n.ends_with(".jar") || n.ends_with(".part")) {
+            let _ = std::fs::remove_file(en.path());
+        }
+    }
+}
+
 /// Escreve para o lado e troca: nunca fica um jar a meio.
 fn write_atomic(target: &Path, b: &[u8]) -> Result<(), String> {
     let tmp = target.with_extension("part");
@@ -17,38 +54,120 @@ fn write_atomic(target: &Path, b: &[u8]) -> Result<(), String> {
     std::fs::rename(&tmp, target).map_err(e)
 }
 
-/// As mods desta versão foram verificadas há menos de 6 horas e estão no disco? Então Jogar não precisa de ir à rede.
-pub fn is_fresh(mods: &Path) -> bool {
-    let recent = std::fs::metadata(mods.join(".synced")).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|d| d.as_secs() < 6 * 3600);
-    recent && !jar_list(mods).is_empty()
+/// O jar principal desta versão está no disco e inteiro? (um jar cortado a meio não abre como zip)
+pub fn has_main(mods: &Path, mc: &str) -> bool {
+    std::fs::File::open(mods.join(format!("{MAIN_ID}-{mc}.jar"))).ok().is_some_and(|f| zip::ZipArchive::new(f).is_ok())
 }
 
-/// Lê o manifesto remoto e deixa na pasta mods o jar certo para a versão `mc` (com SHA1).
+/// O jogo tem o que precisa para arrancar com o Sleep: o jar principal e o Fabric API de que ele depende.
+pub fn is_ready(mods: &Path, mc: &str) -> bool {
+    has_main(mods, mc) && std::fs::File::open(mods.join(format!("fabric-api-{mc}.jar"))).ok().is_some_and(|f| zip::ZipArchive::new(f).is_ok())
+}
+
+/// Numa leitura anterior do manifesto, esta versão do jogo não tinha Sleep? (só assim se pode jogar sem ele quando não há internet)
+pub fn known_without_sleep(mods: &Path) -> bool {
+    mods.join(".no-sleep").exists()
+}
+
+/// As mods desta versão foram verificadas há menos de 6 horas e está lá tudo? Então Jogar não precisa de ir à rede.
+pub fn is_fresh(mods: &Path, mc: &str) -> bool {
+    let recent = std::fs::metadata(mods.join(".synced")).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|d| d.as_secs() < 6 * 3600);
+    recent && is_ready(mods, mc)
+}
+
+/// Descarrega para `.part`, continuando do ponto onde ficou. Só falha se a ligação parar 60 s seguidos: ligações lentas chegam ao fim.
+async fn fetch_part(app: &AppHandle, cl: &reqwest::Client, url: &str, part: &Path) -> Result<(), String> {
+    use std::io::Write;
+    let have = std::fs::metadata(part).map(|m| m.len()).unwrap_or(0);
+    let mut rq = cl.get(url);
+    if have > 0 {
+        rq = rq.header(reqwest::header::RANGE, format!("bytes={have}-"));
+    }
+    let r = tokio::time::timeout(Duration::from_secs(60), rq.send()).await.map_err(|_| "timeout".to_string())?.map_err(e)?;
+    if r.status().as_u16() == 416 {
+        let _ = std::fs::remove_file(part);
+        return Err("HTTP 416".to_string());
+    }
+    let mut r = r.error_for_status().map_err(e)?;
+    let resumed = r.status().as_u16() == 206;
+    let mut f = std::fs::OpenOptions::new().create(true).write(true).append(resumed).truncate(!resumed).open(part).map_err(e)?;
+    let mut done = if resumed { have } else { 0 };
+    let total = done + r.content_length().unwrap_or(0);
+    let mut last = 0u64;
+    while let Some(c) = tokio::time::timeout(Duration::from_secs(60), r.chunk()).await.map_err(|_| "timeout".to_string())?.map_err(e)? {
+        f.write_all(&c).map_err(e)?;
+        done += c.len() as u64;
+        if total > 0 && done - last > 1_000_000 {
+            last = done;
+            let _ = app.emit("progress", json!({"stage": "Sleep", "done": done.min(total.saturating_sub(1)), "total": total}));
+        }
+    }
+    f.flush().map_err(e)
+}
+
+async fn download(app: &AppHandle, url: &str, target: &Path, sha: &str) -> Result<(), String> {
+    // o nome leva o início do SHA1: um download a meio de uma versão antiga nunca se mistura com o da nova
+    let tag: String = sha.chars().take(10).collect();
+    let part = target.with_extension(format!("{tag}.part"));
+    let stem = target.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    if let Some(dir) = target.parent() {
+        for en in std::fs::read_dir(dir).map_err(e)?.flatten() {
+            let n = en.file_name().to_string_lossy().to_string();
+            if n.starts_with(&format!("{stem}.")) && n.ends_with(".part") && en.path() != part {
+                let _ = std::fs::remove_file(en.path());
+            }
+        }
+    }
+    let cl = reqwest::Client::builder().connect_timeout(Duration::from_secs(20)).user_agent("SleepLauncher/1.0").build().map_err(e)?;
+    let mut last = String::new();
+    for _ in 0..8 {
+        match fetch_part(app, &cl, url, &part).await {
+            Ok(()) => {
+                if hex_file(&part).is_some_and(|x| x.eq_ignore_ascii_case(sha)) {
+                    return std::fs::rename(&part, target).map_err(e);
+                }
+                let _ = std::fs::remove_file(&part);
+                last = "SHA1".to_string();
+            }
+            Err(x) => last = x,
+        }
+    }
+    Err(last)
+}
+
+/// Lê o manifesto remoto e deixa na pasta mods o jar certo para a versão `mc` (com SHA1), começando sempre pelo principal.
 /// Formato: {"mods":[{"id":"kubo","files":{"1.21.11":{"url":"...","sha1":"..."}}}]}
-pub async fn sync(url: &str, mc: &str, mods: &Path) -> Result<String, String> {
+/// Um erro a ler o manifesto vem com o prefixo "MANIFEST:" (ainda não se sabe se esta versão tem Sleep).
+pub async fn sync(app: &AppHandle, url: &str, mc: &str, mods: &Path) -> Result<String, String> {
     if url.trim().is_empty() {
         return Ok("sem manifesto de mods".to_string());
     }
-    let m = fetch_json(url).await?;
+    let _g = SYNC_LOCK.lock().await;
+    let m = tokio::time::timeout(Duration::from_secs(25), fetch_json(url)).await.map_err(|_| "MANIFEST:timeout".to_string())?.map_err(|x| format!("MANIFEST:{x}"))?;
     std::fs::create_dir_all(mods).map_err(e)?;
+    purge_bundled(mods);
+    let mut list = m["mods"].as_array().cloned().unwrap_or_default();
+    list.sort_by_key(|md| md["id"].as_str() != Some(MAIN_ID));
+    let offered = list.iter().any(|md| md["id"].as_str() == Some(MAIN_ID) && md["files"][mc]["url"].is_string());
+    let marker = mods.join(".no-sleep");
+    if offered {
+        let _ = std::fs::remove_file(&marker);
+    } else {
+        let _ = std::fs::write(&marker, b"");
+    }
     let mut n = 0;
-    for md in m["mods"].as_array().cloned().unwrap_or_default() {
+    for md in list {
         let id = md["id"].as_str().unwrap_or("");
-        if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        if id.is_empty() || BUNDLED.contains(&id) || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
             continue;
         }
         let f = &md["files"][mc];
         let (Some(u), Some(h)) = (f["url"].as_str(), f["sha1"].as_str()) else { continue };
         let name = format!("{id}-{mc}.jar");
         let target = mods.join(&name);
-        let ok = std::fs::read(&target).map(|b| hex(&b).eq_ignore_ascii_case(h)).unwrap_or(false);
+        let ok = hex_file(&target).is_some_and(|x| x.eq_ignore_ascii_case(h));
         if !ok {
-            let cl = reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(20)).timeout(std::time::Duration::from_secs(600)).build().map_err(e)?;
-            let b = cl.get(u).send().await.map_err(e)?.error_for_status().map_err(e)?.bytes().await.map_err(e)?;
-            if !hex(&b).eq_ignore_ascii_case(h) {
-                return Err(format!("SHA1 errado no mod {id}"));
-            }
-            write_atomic(&target, &b)?;
+            download(app, u, &target, h).await?;
             n += 1;
         }
         // apaga jars antigos do mesmo mod ("id-<só números e pontos>.jar") de outras versões do jogo
@@ -65,7 +184,16 @@ pub async fn sync(url: &str, mc: &str, mods: &Path) -> Result<String, String> {
             }
         }
     }
-    let _ = std::fs::write(mods.join(".synced"), b"");
+    if offered && !has_main(mods, mc) {
+        return Err("SHA1".to_string());
+    }
+    // só chega aqui com todos os jars do manifesto no disco e verificados
+    if offered {
+        let _ = std::fs::write(mods.join(".synced"), b"");
+    }
+    if n > 0 {
+        let _ = app.emit("progress", json!({"stage": "Sleep", "done": 1, "total": 1}));
+    }
     Ok(format!("{n} mod(s) atualizado(s)"))
 }
 

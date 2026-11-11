@@ -25,6 +25,9 @@ for a in src:
         continue
     mid, mc = n[:-4].split("__", 1)
     versions.add(mc)
+    # já vem dentro do jar principal: publicá-lo à parte fazia o jogo arrancar só com ele se o download grande falhasse
+    if mid == "kubo-combat":
+        continue
     tmp = os.path.join(out, "_src.jar")
     urllib.request.urlretrieve(a["url"], tmp)
     add(mid, mc, tmp)

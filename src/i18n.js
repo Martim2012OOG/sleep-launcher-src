@@ -4,7 +4,9 @@
    Textos com números (ex.: "Faltam 50") usam as regras de PADRÕES mais abaixo. Para um idioma novo: nova coluna + entrada em LANGS. */
 (function(){
 const LANGS=[["en","English","🇬🇧"],["pt","Português (Portugal)","🇵🇹"],["es","Español","🇪🇸"]];
-const TABLE=`Aventura|Adventure|Aventura
+const TABLE=`[Sleep] Ainda a carregar. Com muitos mods, o Minecraft pode demorar 1 ou 2 minutos a escrever a primeira linha aqui, sobretudo com antivírus.|[Sleep] Still loading. With many mods, Minecraft can take 1 or 2 minutes to write its first line here, especially with an antivirus.|[Sleep] Todavía cargando. Con muchos mods, Minecraft puede tardar 1 o 2 minutos en escribir la primera línea aquí, sobre todo con antivirus.
+[Sleep] Isto está a demorar demasiado. Vê se apareceu uma janela de erro ou se o antivírus bloqueou o Java. Se continuar, carrega em Parar o jogo e manda o que estiver no separador Logs.|[Sleep] This is taking too long. Check whether an error window appeared or an antivirus blocked Java. If it continues, press Stop the game and send what is in the Logs tab.|[Sleep] Esto está tardando demasiado. Mira si apareció una ventana de error o si el antivirus bloqueó Java. Si continúa, pulsa Parar el juego y envía lo que haya en la pestaña Logs.
+Aventura|Adventure|Aventura
 Desafiante|Challenging|Desafiante
 Combate|Combat|Combate
 Tudo e mais alguma coisa|Kitchen sink|De todo un poco
@@ -459,6 +461,7 @@ const PATS=[
  [/^Podes libertar (.+)\.$/,"You can free $1.","Puedes liberar $1."],
  [/^Continuas na versão (.*)\. Descarrega o instalador da versão (.*) e instala-o por cima\.$/,"You are still on version $1. Download the installer for version $2 and install it over this one.","Sigues en la versión $1. Descarga el instalador de la versión $2 e instálalo encima."],
  [/^Sleep Launcher v(.+)$/,"Sleep Launcher v$1","Sleep Launcher v$1"],
+ [/^Não foi possível descarregar o Sleep \((.+)\)\. Verifica a internet e carrega em Jogar outra vez\.$/,"Couldn't download Sleep ($1). Check your internet and press Play again.","No se pudo descargar Sleep ($1). Comprueba internet y pulsa Jugar otra vez."],
  [/^Importei (\d+) instâncias?\..*$/,"Imported $1 instance(s). The game installs when you press Play.","Importé $1 instancia(s). El juego se instala al pulsar Jugar."],
  [/^A criar (.+)…$/,"Creating $1…","Creando $1…"],
  [/^A otimizar (.+): (.+)…$/,"Optimising $1: $2…","Optimizando $1: $2…"],
