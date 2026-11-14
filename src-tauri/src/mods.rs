@@ -140,13 +140,19 @@ async fn download(app: &AppHandle, url: &str, target: &Path, sha: &str) -> Resul
 /// Formato: {"mods":[{"id":"kubo","files":{"1.21.11":{"url":"...","sha1":"..."}}}]}
 /// Um erro a ler o manifesto vem com o prefixo "MANIFEST:" (ainda não se sabe se esta versão tem Sleep).
 pub async fn sync(app: &AppHandle, url: &str, mc: &str, mods: &Path) -> Result<String, String> {
+    sync_with(app, url, mc, mods, 25).await
+}
+
+/// Igual, mas com o tempo máximo para LER o manifesto à escolha. Os downloads nunca são cortados por tempo: um jar novo de 130 MB
+/// cortado aos 4 s em cada arranque nunca chegava ao fim e o launcher ficava para sempre na versão antiga.
+pub async fn sync_with(app: &AppHandle, url: &str, mc: &str, mods: &Path, manifest_secs: u64) -> Result<String, String> {
     if url.trim().is_empty() {
         return Ok("sem manifesto de mods".to_string());
     }
     let _g = SYNC_LOCK.lock().await;
     // cache-buster: o GitHub/CDN guarda o manifesto uns minutos e a versão nova não aparecia
     let busted = format!("{url}{}t={}", if url.contains('?') { "&" } else { "?" }, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0));
-    let m = tokio::time::timeout(Duration::from_secs(25), fetch_json(&busted)).await.map_err(|_| "MANIFEST:timeout".to_string())?.map_err(|x| format!("MANIFEST:{x}"))?;
+    let m = tokio::time::timeout(Duration::from_secs(manifest_secs), fetch_json(&busted)).await.map_err(|_| "MANIFEST:timeout".to_string())?.map_err(|x| format!("MANIFEST:{x}"))?;
     std::fs::create_dir_all(mods).map_err(e)?;
     purge_bundled(mods);
     let mut list = m["mods"].as_array().cloned().unwrap_or_default();

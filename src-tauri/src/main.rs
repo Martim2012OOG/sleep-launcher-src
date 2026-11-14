@@ -846,7 +846,8 @@ async fn sync_mods(app: &AppHandle, mc: &str, hidden: &Path, game: &Path) -> Res
     let (res, fps) = tokio::join!(
         async {
             if quick {
-                tokio::time::timeout(d, mods::sync(app, &url, mc, hidden)).await.unwrap_or_else(|_| Ok(String::new()))
+                // 4 s só para ler o manifesto (sem internet joga-se com o que há); se há versão nova, descarrega-se até ao fim, com progresso
+                mods::sync_with(app, &url, mc, hidden, 4).await
             } else {
                 mods::sync(app, &url, mc, hidden).await
             }

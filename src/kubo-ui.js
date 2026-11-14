@@ -674,6 +674,7 @@ let AIU={};const aiUrl=i=>AIU[i]||(AIU[i]=mkIcon(AIC[i][1],AIC[i][2]));
 async function useAppIcon(url,save){try{await inv("set_app_icon",{b64:url.split(",")[1]});if(save)S.aiSel=save;lsSet("kubo.appicon",JSON.stringify(save))}catch(x){toast("Não foi possível mudar o ícone.")}}
 function aiSection(){const sel=S.aiSel||{p:0};return`<h3 class="vh">Ícone da app</h3><p class="tag">Muda o ícone do Sleep no Dock e na barra de tarefas. Escolhe um, ou carrega uma imagem tua.</p><div class="aigrid">${AIC.map((a,i)=>`<button class="aitile ${sel.p===i?"act":""}" data-a="kai" data-v="${i}" title="${esc(a[0])}"><img src="${aiUrl(i)}" alt=""></button>`).join("")}${sel.c?`<button class="aitile act" data-a="kai" data-v="c" title="A tua imagem"><img src="${sel.c}" alt=""></button>`:""}<label class="aitile aiup" title="Carregar imagem">+<input type="file" id="kaif" accept="image/*" hidden></label></div>`}
 const _vSet3=vSet;vSet=function(){const h=_vSet3();return h.replace(/<\/div>\s*$/,aiSection()+"</div>")};
+V.set=vSet;
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a=kai]");if(!el)return;e.stopPropagation();const v=el.dataset.v;
  if(v=="c"&&S.aiSel&&S.aiSel.c){useAppIcon(S.aiSel.c,S.aiSel)}else{const i=+v;useAppIcon(aiUrl(i),{p:i})}render()},true);
 document.addEventListener("change",async e=>{const t=e.target;if(t.id!="kaif"||!t.files[0])return;e.stopImmediatePropagation();
