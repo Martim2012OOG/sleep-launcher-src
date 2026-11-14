@@ -144,7 +144,9 @@ pub async fn sync(app: &AppHandle, url: &str, mc: &str, mods: &Path) -> Result<S
         return Ok("sem manifesto de mods".to_string());
     }
     let _g = SYNC_LOCK.lock().await;
-    let m = tokio::time::timeout(Duration::from_secs(25), fetch_json(url)).await.map_err(|_| "MANIFEST:timeout".to_string())?.map_err(|x| format!("MANIFEST:{x}"))?;
+    // cache-buster: o GitHub/CDN guarda o manifesto uns minutos e a versão nova não aparecia
+    let busted = format!("{url}{}t={}", if url.contains('?') { "&" } else { "?" }, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0));
+    let m = tokio::time::timeout(Duration::from_secs(25), fetch_json(&busted)).await.map_err(|_| "MANIFEST:timeout".to_string())?.map_err(|x| format!("MANIFEST:{x}"))?;
     std::fs::create_dir_all(mods).map_err(e)?;
     purge_bundled(mods);
     let mut list = m["mods"].as_array().cloned().unwrap_or_default();

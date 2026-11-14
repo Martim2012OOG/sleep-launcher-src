@@ -104,12 +104,7 @@ O macOS não deixa atualizar uma app aberta a partir do disco de instalação ou
 O servidor de amigos recusou a ligação. Tenta mais tarde.|The friends server refused the connection. Try again later.|El servidor de amigos rechazó la conexión. Inténtalo más tarde.
 A preparar o jogo… (a primeira vez demora um pouco)|Getting the game ready… (the first time takes a while)|Preparando el juego… (la primera vez tarda un poco)
 A Mojang limitou os pedidos de capa. Espera cerca de 1 minuto e tenta outra vez.|Mojang is limiting cape requests. Wait about a minute and try again.|Mojang limitó las peticiones de capa. Espera un minuto e inténtalo de nuevo.
-Fundo da página inicial|Home page background|Fondo de la página de inicio
-Cena 3D que aparece atrás do teu boneco. Automático: Natal de 1 de novembro a 31 de dezembro, o resto do ano a cena normal.|3D scene shown behind your character. Automatic: Christmas from 1 November to 31 December, the normal scene the rest of the year.|Escena 3D que aparece detrás de tu personaje. Automático: Navidad del 1 de noviembre al 31 de diciembre, el resto del año la escena normal.
-Automático|Automatic|Automático
-Natal|Christmas|Navidad
-FNAF|FNAF|FNAF
-Imagem clássica|Classic image|Imagen clásica
+Pasta|Folder|Carpeta
 Esta app tem uma nova versão|This app has a new version|Esta app tiene una versión nueva
 Por favor atualiza a app para continuar a jogar. Queres atualizar agora?|Please update the app to keep playing. Do you want to update now?|Actualiza la app para seguir jugando. ¿Quieres actualizar ahora?
 Não, fechar a app|No, close the app|No, cerrar la app
@@ -427,7 +422,6 @@ Instalar e jogar|Install and play|Instalar y jugar
 Mundo|World|Mundo
 Captura|Screenshot|Captura
 Servidor|Server|Servidor
-Pasta|Folder|Carpeta
 Apagar instância?|Delete instance?|¿Borrar instancia?
 Não deu para ler as skins:|Couldn't read the skins:|No se pudieron leer las skins:
 Ainda não enviaste nenhuma skin.|You haven't uploaded any skin yet.|Aún no has subido ninguna skin.

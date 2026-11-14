@@ -801,9 +801,8 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
         // a mod do Sleep é uma mod Fabric (o Quilt também a carrega)
         // fica escondida na pasta de dados do launcher (nunca em game/mods) e o Fabric Loader vai buscá-la por -Dfabric.addMods
         let hidden = root(&app)?.join("kubo-mods").join(&mc);
-        if !mods::is_fresh(&hidden, &mc) {
-            note = sync_mods(&app, &mc, &hidden, &game).await?;
-        }
+        // verifica sempre se há uma versão nova (compara o SHA1 do manifesto com o jar local)
+        note = sync_mods(&app, &mc, &hidden, &game).await?;
         mods::purge_visible(&game.join("mods"));
         mods::purge_bundled(&hidden);
         // sem o jar principal nenhuma das outras entra: as extensões dependem dele e o jogo crashava
@@ -891,9 +890,7 @@ async fn prefetch_mods(app: AppHandle) -> Result<(), String> {
     }
     let mc = inst["version"].as_str().unwrap_or("").to_string();
     let hidden = root(&app)?.join("kubo-mods").join(&mc);
-    if !mods::is_fresh(&hidden, &mc) {
-        let _ = mods::sync(&app, &manifest_url(), &mc, &hidden).await;
-    }
+    let _ = mods::sync(&app, &manifest_url(), &mc, &hidden).await;
     Ok(())
 }
 

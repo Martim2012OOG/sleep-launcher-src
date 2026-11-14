@@ -466,11 +466,8 @@ body.starting .btn[data-a=play]::before,body.starting .lbig::before{content:"";d
 @keyframes kspin{to{transform:rotate(360deg)}}
 
 /* fundo 3D da página inicial: o cenário e o boneco são 3D no mesmo mundo */
-.hero.h3d{isolation:isolate;background:linear-gradient(180deg,#0b0f22,#05060f)}
 .hero .k3d{position:absolute;inset:0;width:100%;height:100%;z-index:-1;display:block;cursor:grab;touch-action:none}
 .hero .k3d:active{cursor:grabbing}
-.hero.h3d .fig{display:none}
-.hero.h3d::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(6,10,40,0) 62%,rgba(6,10,30,.55))}
 
 /* definições */
 .setrow{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:12px 0;border-top:1px solid var(--border)}
@@ -491,3 +488,6 @@ body.starting .btn[data-a=play]::before,body.starting .lbig::before{content:"";d
 .mpg .res{grid-template-columns:1fr}
 .mpg .res .ac{flex-direction:row}
 .mpg .res .t p{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+.tabs .tsep{width:1px;align-self:stretch;margin:6px 6px;background:var(--bd,rgba(255,255,255,.14))}
+.ban .btn[data-a=folder]{width:auto;padding:0 12px;gap:6px}

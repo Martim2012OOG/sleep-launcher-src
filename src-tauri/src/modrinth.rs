@@ -227,6 +227,25 @@ fn jar_meta(p: &Path) -> (Option<String>, Option<String>, Option<String>) {
     (name, author, icon)
 }
 
+/// O `pack.png` de um resource pack / shader (zip ou pasta), como data URL. Ignora imagens grandes demais.
+fn pack_icon(p: &Path) -> Option<String> {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    use std::io::Read;
+    let bytes: Vec<u8> = if p.is_dir() {
+        std::fs::read(p.join("pack.png")).ok()?
+    } else {
+        let mut z = zip::ZipArchive::new(std::fs::File::open(p).ok()?).ok()?;
+        let mut f = z.by_name("pack.png").ok()?;
+        let mut b = Vec::new();
+        f.take(2_000_000).read_to_end(&mut b).ok()?;
+        b
+    };
+    if bytes.len() < 8 || bytes.len() > 1_500_000 || &bytes[1..4] != b"PNG" {
+        return None;
+    }
+    Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes)))
+}
+
 pub fn list(game: &Path, kind: &str) -> Result<Vec<Value>, String> {
     let fo = folder(kind)?;
     let idx = idx_read(game);
@@ -236,7 +255,8 @@ pub fn list(game: &Path, kind: &str) -> Result<Vec<Value>, String> {
             let name = en.file_name().to_string_lossy().to_string();
             let enabled = !name.ends_with(".disabled");
             let base = name.trim_end_matches(".disabled").to_string();
-            if !(base.ends_with(".jar") || base.ends_with(".zip")) {
+            let is_dir = en.path().is_dir();
+            if !(base.ends_with(".jar") || base.ends_with(".zip") || (is_dir && fo != "mods")) {
                 continue;
             }
             let (mut title, mut icon, mut project) = (base.clone(), Value::Null, Value::Null);
@@ -262,6 +282,11 @@ pub fn list(game: &Path, kind: &str) -> Result<Vec<Value>, String> {
                     icon = json!(ic);
                 }
             }
+            if icon.is_null() && fo != "mods" {
+                if let Some(ic) = pack_icon(&game.join(fo).join(&name)) {
+                    icon = json!(ic);
+                }
+            }
             out.push(json!({ "file": name, "enabled": enabled, "title": title, "icon": icon, "project": project, "author": author }));
         }
     }
@@ -282,7 +307,12 @@ pub fn toggle(game: &Path, kind: &str, file: &str) -> Result<(), String> {
 pub fn remove(game: &Path, kind: &str, file: &str) -> Result<(), String> {
     let fo = folder(kind)?;
     let name = safe(file)?;
-    std::fs::remove_file(game.join(fo).join(&name)).map_err(e)?;
+    let target = game.join(fo).join(&name);
+    if target.is_dir() {
+        std::fs::remove_dir_all(&target).map_err(e)?;
+    } else {
+        std::fs::remove_file(&target).map_err(e)?;
+    }
     let base = name.trim_end_matches(".disabled").to_string();
     let mut idx = idx_read(game);
     let key = idx[fo]

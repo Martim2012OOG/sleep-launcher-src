@@ -82,7 +82,7 @@ function fallback2d(why){const ph=document.getElementById("sv3d");if(!ph)return;
  const c=document.createElement("canvas");c.className="fig";c.dataset.fig="";c.width=160;c.height=320;ph.replaceWith(c);paint()}
 /* com o jogo aberto o launcher não desenha 3D: a placa gráfica fica toda para o jogo */
 const gaming=()=>Object.keys(X.run).length>0;
-function gamePause(){if(gaming()){if(V3)V3.renderPaused=true;if(window.K3D)K3D.pause()}else render()}
+function gamePause(){if(gaming()){if(V3)V3.renderPaused=true}else render()}
 if(T)T.event.listen("game-state",()=>setTimeout(gamePause,0));
 function mount3d(){const ph=document.getElementById("sv3d");
  if(!ph){if(V3)V3.renderPaused=true;return}
@@ -550,7 +550,7 @@ render=function(){syncGate();if(!S.ready||!S.acc)return;
    corre também quando o #app muda, venha o desenho de onde vier */
 let posting=false;
 function post(){if(posting)return;posting=true;try{const t=document.querySelector('header.top');if(t)t.setAttribute('data-tauri-drag-region','')}catch(x){}if(!S.ready||!S.acc){posting=false;return}
- for(const f of [()=>{S.inst.forEach(loadPano)},()=>{if(!S.__hz){S.__hz=1;loadHz().then(()=>render());loadAllV()}},capeCards,()=>{if(!vpnSynced&&T){vpnSynced=true;vpnApply()}},slideBar,enhanceSelects,mount3d,splitter,sideSplit,()=>{if(S.page=="play")loadNews()},swapIcons,heroApply]){try{f()}catch(x){console.error(x);if(f===mount3d)fallback2d(x)}}
+ for(const f of [()=>{S.inst.forEach(loadPano)},()=>{if(!S.__hz){S.__hz=1;loadHz().then(()=>render());loadAllV()}},capeCards,()=>{if(!vpnSynced&&T){vpnSynced=true;vpnApply()}},slideBar,enhanceSelects,mount3d,splitter,sideSplit,()=>{if(S.page=="play")loadNews()},swapIcons]){try{f()}catch(x){console.error(x);if(f===mount3d)fallback2d(x)}}
  posting=false}
 new MutationObserver(()=>post()).observe(document.getElementById("app"),{childList:true});
 new MutationObserver(()=>{if(document.querySelector("#app select:not([data-k]):not([data-a=sel])"))enhanceSelects()}).observe(document.getElementById("app"),{childList:true,subtree:true});
@@ -680,24 +680,6 @@ document.addEventListener("change",async e=>{const t=e.target;if(t.id!="kaif"||!
  const u=await shrink(t.files[0],512,512,true);useAppIcon(u,{c:u});render()},true);
 try{const sv=JSON.parse(lsGet("kubo.appicon","null"));if(sv){S.aiSel=sv;MASC.onload=()=>setTimeout(()=>{const u=sv.c||(sv.p!=null&&sv.p>0?aiUrl(sv.p):null);if(u&&T)inv("set_app_icon",{b64:u.split(",")[1]}).catch(()=>{})},800);if(MASC.complete)MASC.onload()}}catch(e){}
 
-
-/* ---------- fundo 3D da página inicial (no lugar da foto): Natal de 1 nov a 31 dez, depois a cena normal; dá para escolher nas definições ---------- */
-const HERO=[["image","Imagem clássica"],["auto","Automático"],["christmas","Natal"],["fnaf","FNAF"]];
-const heroKey=()=>{const v=lsGet("kubo.hero","image");if(v&&v!="auto")return v;const m=new Date().getMonth();return m>=10?"christmas":"fnaf"};
-let K3L=null,K3S="";
-function heroApply(){const h=document.querySelector(".hero");if(!h){if(window.K3D)K3D.pause();return}const k=heroKey();
- if(k=="image"||gaming()){if(window.K3D)K3D.pause();h.classList.remove("h3d");return}
- if(!K3L)K3L=new Promise(r=>{const s=document.createElement("script");s.src="vendor/scene3d.js";s.onload=()=>r(1);s.onerror=()=>r(0);document.head.appendChild(s)});
- K3L.then(ok=>{if(!ok||!window.K3D)return;const hh=document.querySelector(".hero");if(!hh)return;
-  /* o boneco é 3D dentro do cenário, com a tua skin */
-  const im=S.skin&&S.skin.naturalWidth?S.skin:null;const sk=(S.acc&&S.acc.skins||[]).find(x=>x.state=="ACTIVE");
-  const use=im||(STEVE&&STEVE.naturalWidth?STEVE:null);
-  hh.classList.add("h3d");
-  K3D.mount(hh,{scene:k,skin:use,slim:!!(sk&&sk.variant=="SLIM")})})}
-function heroSection(){const cur=lsGet("kubo.hero","image")||"image";return`<h3 class="vh">Fundo da página inicial</h3><p class="tag">Cena 3D que aparece atrás do teu boneco. Automático: Natal de 1 de novembro a 31 de dezembro, o resto do ano a cena normal.</p><div class="row" style="gap:8px;flex-wrap:wrap">${HERO.map(h=>`<button class="btn ${cur===h[0]?"p":""}" data-a="khero" data-v="${h[0]}">${h[1]}</button>`).join("")}</div>`}
-const _vSet4=vSet;vSet=function(){const h=_vSet4();return h.replace(/<\/div>\s*$/,heroSection()+"</div>")};
-V.set=vSet;
-document.addEventListener("click",e=>{const el=e.target.closest("[data-a=khero]");if(!el)return;e.stopPropagation();lsSet("kubo.hero",el.dataset.v);render();heroApply()},true);
 
 /* o idioma e as preferências vêm de settings.json antes de a interface aparecer */
 Promise.all([inv("get_account").then(a=>{S.acc=a}).catch(()=>{}),inv("get_settings").then(r=>{S.pf=r||{};if(r&&["en","pt","es"].includes(r.lang))KL.init(r.lang);else if(T)inv("save_pref",{key:"lang",value:KL.get()}).catch(()=>{})}).catch(()=>{})]).finally(()=>{applyPrefs();S.ready=true;render();intro();if(T){setTimeout(autoUpd,1500);setTimeout(()=>inv("prefetch_mods").catch(()=>{}),2500)}});
