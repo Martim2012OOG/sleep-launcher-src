@@ -4,13 +4,17 @@
       "id": "kubo",
       "files": {
         "1.20.1": { "url": "https://O-TEU-SITE/kubo-1.20.1.jar", "sha1": "SHA1_DO_FICHEIRO" },
-        "1.21.11": { "url": "https://O-TEU-SITE/kubo-1.21.11.jar", "sha1": "SHA1_DO_FICHEIRO" }
+        "1.21.11": { "url": "https://O-TEU-SITE/kubo-1.21.11.jar", "sha1": "SHA1_DO_FICHEIRO" },
+        "26.1": { "url": "https://O-TEU-SITE/kubo-26.1.jar", "sha1": "SHA1_DO_FICHEIRO" },
+        "26.2": { "url": "https://O-TEU-SITE/kubo-26.2.jar", "sha1": "SHA1_DO_FICHEIRO" }
       }
     },
     {
       "id": "fabric-api",
       "files": {
-        "1.21.11": { "url": "https://O-TEU-SITE/fabric-api-1.21.11.jar", "sha1": "SHA1_DO_FICHEIRO" }
+        "1.21.11": { "url": "https://O-TEU-SITE/fabric-api-1.21.11.jar", "sha1": "SHA1_DO_FICHEIRO" },
+        "26.1": { "url": "https://O-TEU-SITE/fabric-api-26.1.jar", "sha1": "SHA1_DO_FICHEIRO" },
+        "26.2": { "url": "https://O-TEU-SITE/fabric-api-26.2.jar", "sha1": "SHA1_DO_FICHEIRO" }
       }
     }
   ]

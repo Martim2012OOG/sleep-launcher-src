@@ -61,8 +61,42 @@ fn read_json(p: &Path) -> Option<Value> {
     std::fs::read(p).ok().and_then(|b| serde_json::from_slice(&b).ok())
 }
 
+/// "26.1" / "26.1.2" (versões novas do Minecraft, sem o "1.") dentro de um texto, junto de + - _ ou espaço, ou a abrir.
+fn mc_ver_26(s: &str) -> Option<String> {
+    let b = s.as_bytes();
+    let mut i = 0;
+    while i + 3 < b.len() {
+        if b[i] == b'2' && b[i + 1] == b'6' && b[i + 2] == b'.' && (i == 0 || matches!(b[i - 1], b'+' | b'-' | b'_' | b' ' | b'(' | b'[' | b'/')) {
+            let mut j = i + 3;
+            let st = j;
+            while j < b.len() && b[j].is_ascii_digit() {
+                j += 1;
+            }
+            if j > st && j - st <= 2 {
+                let mut end = j;
+                if j < b.len() && b[j] == b'.' {
+                    let mut k = j + 1;
+                    let s2 = k;
+                    while k < b.len() && b[k].is_ascii_digit() {
+                        k += 1;
+                    }
+                    if k > s2 && k - s2 <= 2 {
+                        end = k;
+                    }
+                }
+                return Some(s[i..end].to_string());
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
 /// "1.21.11" dentro de um texto (só versões 1.x): junto de + - _ ou espaço, ou a abrir.
 fn mc_ver_in(s: &str) -> Option<String> {
+    if let Some(v) = mc_ver_26(s) {
+        return Some(v);
+    }
     let b = s.as_bytes();
     let mut i = 0;
     while i + 3 < b.len() {

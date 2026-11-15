@@ -204,6 +204,35 @@ pub async fn sync_with(app: &AppHandle, url: &str, mc: &str, mods: &Path, manife
     Ok(format!("{n} mod(s) atualizado(s)"))
 }
 
+/// Lista embutida de mods de FPS (Modrinth, SHA1 verificado) para as versões do jogo que o Sleep suporta.
+fn builtin_perf(mc: &str) -> Option<serde_json::Value> {
+    let rows: &[(&str, &str, &str)] = match mc {
+        "1.21.11" => &[
+            ("sodium", "https://cdn.modrinth.com/data/AANobbMI/versions/RB7CDjTS/sodium-fabric-0.8.15-beta.1%2Bmc1.21.11.jar", "5469cef6f5dddd72a1216d9a15393c90d8eb5f33"),
+            ("lithium", "https://cdn.modrinth.com/data/gvQqBUqZ/versions/Ow7wA0kG/lithium-fabric-0.21.4%2Bmc1.21.11.jar", "203bdcb26e97b3217b045e1182651a7d7b6462ec"),
+            ("immediatelyfast", "https://cdn.modrinth.com/data/5ZwdcRci/versions/4EwhsTu7/ImmediatelyFast-Fabric-1.14.3%2B1.21.11.jar", "43e451464f979bdf9ff4ac288b358a2f91b79ed8"),
+            ("entityculling", "https://cdn.modrinth.com/data/NNAgCjsB/versions/hsBqkNc8/entityculling-fabric-1.12.1-mc1.21.11.jar", "75ede5f8df348f49102d16eb76da3dd1491dfb79"),
+            ("ferrite-core", "https://cdn.modrinth.com/data/uXXizFIs/versions/Ii0gP3D8/ferritecore-8.2.0-fabric.jar", "c2e2f5e008f5bc9f401dfad8ca94909917006b65"),
+        ],
+        "26.1" => &[
+            ("sodium", "https://cdn.modrinth.com/data/AANobbMI/versions/uGvVQBnw/sodium-fabric-0.8.9%2Bmc26.1.1.jar", "48b949ec71365788dfd4e89d489f7abd504aa709"),
+            ("lithium", "https://cdn.modrinth.com/data/gvQqBUqZ/versions/Oqq8TOAV/lithium-fabric-0.24.7%2Bmc26.1.2.jar", "7959f418969ee8bfe50c0f21f352ed08b382f133"),
+            ("immediatelyfast", "https://cdn.modrinth.com/data/5ZwdcRci/versions/xOA9hbpf/ImmediatelyFast-Fabric-1.15.3%2B26.1.jar", "0bc5865bcb7f2f09d85559a58fccddcfd335f44d"),
+            ("entityculling", "https://cdn.modrinth.com/data/NNAgCjsB/versions/5fl0jM6C/entityculling-fabric-1.12.1-mc26.1.jar", "19138849906ea0c0c7e0c456f04713d1f6ea8a89"),
+            ("ferrite-core", "https://cdn.modrinth.com/data/uXXizFIs/versions/d5ddUdiB/ferritecore-9.0.0-fabric.jar", "eac76ff0f3753422c61b2c44487d0d195d88d4bc"),
+        ],
+        "26.2" => &[
+            ("sodium", "https://cdn.modrinth.com/data/AANobbMI/versions/xJZxADzI/sodium-fabric-0.9.2%2Bmc26.2.jar", "62a70961a5b3e06938e06ab5f2dc4c5a51cf3323"),
+            ("lithium", "https://cdn.modrinth.com/data/gvQqBUqZ/versions/f7vZ0VWU/lithium-fabric-0.25.3%2Bmc26.2.jar", "435ad0289209bb72195e7a423756a03f5dfa5a9a"),
+            ("immediatelyfast", "https://cdn.modrinth.com/data/5ZwdcRci/versions/pMWERcSu/ImmediatelyFast-Fabric-1.16.5%2B26.2.jar", "0286260261591fe77ba0d332d5d5a2d2e868c2c6"),
+            ("entityculling", "https://cdn.modrinth.com/data/NNAgCjsB/versions/kHxKicVG/entityculling-fabric-1.12.1-mc26.2.jar", "d79658b6e729a4d22981342a5524ec9e6c420f3a"),
+            ("ferrite-core", "https://cdn.modrinth.com/data/uXXizFIs/versions/d5ddUdiB/ferritecore-9.0.0-fabric.jar", "eac76ff0f3753422c61b2c44487d0d195d88d4bc"),
+        ],
+        _ => return None,
+    };
+    Some(serde_json::Value::Array(rows.iter().map(|(id, u, h)| json!({"id": id, "files": {mc: {"url": u, "sha1": h}}})).collect()))
+}
+
 /// Mods de FPS (lista "perf" do manifesto: Sodium, Lithium, FerriteCore, Entity Culling, ImmediatelyFast), descarregados da Modrinth para a
 /// pasta escondida. Se a instância já tem um deles na pasta mods (visível) NÃO se junta outro (o Fabric recusa mods duplicados).
 /// `enabled = false` apaga os que estavam instalados aqui.
@@ -225,7 +254,13 @@ pub async fn sync_perf(url: &str, mc: &str, hidden: &Path, visible: &Path, enabl
     if url.trim().is_empty() {
         return Ok(String::new());
     }
-    let m = fetch_json(url).await?;
+    // com o manifesto a falhar (ou sem a lista "perf") usa-se a lista embutida da Modrinth (1.21.11, 26.1 e 26.2), com SHA1 verificado
+    let mut m = fetch_json(url).await.unwrap_or_else(|_| json!({}));
+    if m["perf"].as_array().map(|a| a.is_empty()).unwrap_or(true) {
+        if let Some(list) = builtin_perf(mc) {
+            m["perf"] = list;
+        }
+    }
     let vis: Vec<String> = std::fs::read_dir(visible)
         .map(|r| r.flatten().map(|e| e.file_name().to_string_lossy().to_lowercase()).filter(|n| n.ends_with(".jar")).collect())
         .unwrap_or_default();
@@ -281,4 +316,24 @@ pub fn purge_visible(mods: &Path) {
             let _ = std::fs::remove_file(en.path());
         }
     }
+}
+
+/// Mods de terceiros que crasham o jogo ao entrar num servidor: o "Online Emotes" 3.4.x pede uma biblioteca (team.unnamed.mocha) que o
+/// Emotecraft / Player Animation Library atuais não trazem, e dá NoClassDefFoundError no momento de entrar. Ficam desligados (".disabled", nada
+/// é apagado): o Sleep já traz as suas próprias emotes. Devolve quantos desligou.
+pub fn disable_crashers(mods: &Path) -> usize {
+    let Ok(rd) = std::fs::read_dir(mods) else { return 0 };
+    let mut n = 0;
+    for en in rd.flatten() {
+        let name = en.file_name().to_string_lossy().to_string();
+        let low = name.to_lowercase();
+        if low.ends_with(".jar") && (low.starts_with("online_emotes") || low.starts_with("online-emotes") || low.starts_with("onlineemotes")) {
+            let mut to = en.path().into_os_string();
+            to.push(".disabled");
+            if std::fs::rename(en.path(), &to).is_ok() {
+                n += 1;
+            }
+        }
+    }
+    n
 }

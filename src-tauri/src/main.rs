@@ -804,6 +804,10 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
         // verifica sempre se há uma versão nova (compara o SHA1 do manifesto com o jar local)
         note = sync_mods(&app, &mc, &hidden, &game).await?;
         mods::purge_visible(&game.join("mods"));
+        let off = mods::disable_crashers(&game.join("mods"));
+        if off > 0 {
+            note = format!("{note} Online Emotes desligado (fazia o jogo crashar ao entrar num servidor).").trim().to_string();
+        }
         mods::purge_bundled(&hidden);
         // sem o jar principal nenhuma das outras entra: as extensões dependem dele e o jogo crashava
         let list = if mods::has_main(&hidden, &mc) { mods::jar_list(&hidden) } else { String::new() };
@@ -841,7 +845,7 @@ async fn sync_mods(app: &AppHandle, mc: &str, hidden: &Path, game: &Path) -> Res
     // com o Sleep já no disco (ou numa versão que não o tem) espera-se no máximo 4 s pela rede; as duas verificações correm ao mesmo tempo
     let quick = have || mods::known_without_sleep(hidden);
     let d = std::time::Duration::from_secs(if quick { 4 } else { 45 });
-    let fps_on = settings(app)["fps_boost"].as_bool().unwrap_or(false);
+    let fps_on = settings(app)["fps_boost"].as_bool().unwrap_or(true);
     let gm = game.join("mods");
     let (res, fps) = tokio::join!(
         async {
