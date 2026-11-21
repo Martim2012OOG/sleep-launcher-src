@@ -20,12 +20,42 @@ fn hex(b: &[u8]) -> String {
     format!("{:x}", Sha1::digest(b))
 }
 
-/// SHA1 de um ficheiro, lido aos bocados (o jar principal tem mais de 100 MB).
+/// Ficheiro ao lado do jar com "tamanho:mtime SHA1": se o jar não mudou, não se volta a ler 190 MB (no Windows o antivírus analisa cada leitura).
+fn side(p: &Path) -> std::path::PathBuf {
+    let mut s = p.as_os_str().to_os_string();
+    s.push(".sha1");
+    s.into()
+}
+
+fn stamp(p: &Path) -> Option<String> {
+    let m = std::fs::metadata(p).ok()?;
+    let t = m.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
+    Some(format!("{}:{}", m.len(), t))
+}
+
+/// Guarda o SHA1 já conhecido de um jar (depois de o descarregar e conferir).
+fn remember(p: &Path, sha: &str) {
+    if let Some(st) = stamp(p) {
+        let _ = std::fs::write(side(p), format!("{st} {}", sha.to_lowercase()));
+    }
+}
+
+/// SHA1 de um ficheiro, lido aos bocados (o jar principal tem mais de 100 MB). Para jars usa a cache acima.
 fn hex_file(p: &Path) -> Option<String> {
     use std::io::Read;
+    let cacheable = p.extension().is_some_and(|x| x == "jar");
+    if cacheable {
+        if let (Some(st), Ok(txt)) = (stamp(p), std::fs::read_to_string(side(p))) {
+            if let Some((s, h)) = txt.trim().split_once(' ') {
+                if s == st && h.len() == 40 {
+                    return Some(h.to_string());
+                }
+            }
+        }
+    }
     let mut f = std::fs::File::open(p).ok()?;
     let mut h = Sha1::new();
-    let mut b = vec![0u8; 1 << 20];
+    let mut b = vec![0u8; 4 << 20];
     loop {
         let n = f.read(&mut b).ok()?;
         if n == 0 {
@@ -33,7 +63,11 @@ fn hex_file(p: &Path) -> Option<String> {
         }
         h.update(&b[..n]);
     }
-    Some(format!("{:x}", h.finalize()))
+    let out = format!("{:x}", h.finalize());
+    if cacheable {
+        remember(p, &out);
+    }
+    Some(out)
 }
 
 /// Apaga as cópias soltas das extensões que já vêm dentro do jar principal.
@@ -106,6 +140,150 @@ async fn fetch_part(app: &AppHandle, cl: &reqwest::Client, url: &str, part: &Pat
     f.flush().map_err(e)
 }
 
+/// Escreve `buf` na posição `off` (várias ligações escrevem em sítios diferentes do mesmo ficheiro ao mesmo tempo).
+#[cfg(windows)]
+fn write_at(f: &std::fs::File, buf: &[u8], off: u64) -> std::io::Result<()> {
+    use std::os::windows::fs::FileExt;
+    let mut done = 0usize;
+    while done < buf.len() {
+        let n = f.seek_write(&buf[done..], off + done as u64)?;
+        if n == 0 {
+            return Err(std::io::Error::new(std::io::ErrorKind::WriteZero, "write 0"));
+        }
+        done += n;
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn write_at(f: &std::fs::File, buf: &[u8], off: u64) -> std::io::Result<()> {
+    use std::os::unix::fs::FileExt;
+    f.write_all_at(buf, off)
+}
+
+/// Tamanho de cada pedaço e quantas ligações ao mesmo tempo. Uma só ligação ao GitHub fica presa a uma fração da largura de banda
+/// (no Windows eram minutos para o jar de 190 MB): com várias ligações cada uma traz um pedaço e a velocidade soma.
+const SEG: u64 = 8 << 20;
+const PARALLEL: usize = 8;
+
+/// Descarrega um pedaço [start, end] para dentro do ficheiro. Conta no `done` só o que ficou escrito.
+async fn fetch_seg(cl: &reqwest::Client, url: &str, f: &std::sync::Arc<std::fs::File>, start: u64, end: u64, got: &mut u64, on_bytes: &(dyn Fn(u64) + Sync)) -> Result<(), String> {
+    let rq = cl.get(url).header(reqwest::header::RANGE, format!("bytes={start}-{end}"));
+    let mut r = tokio::time::timeout(Duration::from_secs(60), rq.send()).await.map_err(|_| "timeout".to_string())?.map_err(e)?;
+    if r.status().as_u16() != 206 {
+        return Err(format!("HTTP {}", r.status().as_u16()));
+    }
+    let mut buf: Vec<u8> = Vec::with_capacity(1 << 20);
+    let mut off = start;
+    while let Some(c) = tokio::time::timeout(Duration::from_secs(60), r.chunk()).await.map_err(|_| "timeout".to_string())?.map_err(e)? {
+        buf.extend_from_slice(&c);
+        // escritas grandes (1 MB) em vez de uma por cada bocadinho de rede: no Windows cada escrita pequena passa pelo antivírus
+        if buf.len() >= (1 << 20) {
+            let (ff, data, at) = (f.clone(), std::mem::take(&mut buf), off);
+            let n = data.len() as u64;
+            tokio::task::spawn_blocking(move || write_at(&ff, &data, at)).await.map_err(e)?.map_err(e)?;
+            off += n;
+            *got += n;
+            on_bytes(n);
+            buf = Vec::with_capacity(1 << 20);
+        }
+    }
+    if !buf.is_empty() {
+        let (ff, data, at) = (f.clone(), std::mem::take(&mut buf), off);
+        let n = data.len() as u64;
+        tokio::task::spawn_blocking(move || write_at(&ff, &data, at)).await.map_err(e)?.map_err(e)?;
+        off += n;
+        *got += n;
+        on_bytes(n);
+    }
+    if off != end + 1 {
+        return Err("pedaço incompleto".to_string());
+    }
+    Ok(())
+}
+
+/// Descarrega o ficheiro inteiro em várias ligações (pedaços de 8 MB). Erra se o servidor não aceitar pedaços: aí usa-se `fetch_part`.
+async fn fetch_parallel(app: &AppHandle, cl: &reqwest::Client, url: &str, part: &Path) -> Result<(), String> {
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::Arc;
+    // o tamanho vem do "Content-Range: bytes 0-0/TOTAL" de um pedido de 1 byte
+    let r = tokio::time::timeout(Duration::from_secs(30), cl.get(url).header(reqwest::header::RANGE, "bytes=0-0").send())
+        .await
+        .map_err(|_| "timeout".to_string())?
+        .map_err(e)?;
+    if r.status().as_u16() != 206 {
+        return Err("sem pedaços".to_string());
+    }
+    let total: u64 = r
+        .headers()
+        .get(reqwest::header::CONTENT_RANGE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.rsplit('/').next())
+        .and_then(|s| s.trim().parse().ok())
+        .ok_or_else(|| "sem tamanho".to_string())?;
+    drop(r);
+    if total < (16 << 20) {
+        return Err("pequeno".to_string());
+    }
+    let f = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(part).map_err(e)?;
+    f.set_len(total).map_err(e)?;
+    let f = Arc::new(f);
+    let nseg = total.div_ceil(SEG);
+    let next = Arc::new(AtomicU64::new(0));
+    let done = Arc::new(AtomicU64::new(0));
+    let last = Arc::new(AtomicU64::new(0));
+    let stop = Arc::new(AtomicBool::new(false));
+    let mut tasks = Vec::new();
+    for _ in 0..(PARALLEL as u64).min(nseg) {
+        let (cl, url, f, next, done, last, stop, app) = (cl.clone(), url.to_string(), f.clone(), next.clone(), done.clone(), last.clone(), stop.clone(), app.clone());
+        tasks.push(tokio::spawn(async move {
+            loop {
+                let i = next.fetch_add(1, Ordering::SeqCst);
+                if i >= nseg || stop.load(Ordering::SeqCst) {
+                    return Ok::<(), String>(());
+                }
+                let (start, end) = (i * SEG, ((i + 1) * SEG).min(total) - 1);
+                let mut tries = 0u64;
+                loop {
+                    let mut got = 0u64;
+                    let on_bytes = |n: u64| {
+                        let d = done.fetch_add(n, Ordering::SeqCst) + n;
+                        let l = last.load(Ordering::Relaxed);
+                        if d.saturating_sub(l) > 1_000_000 && last.compare_exchange(l, d, Ordering::SeqCst, Ordering::Relaxed).is_ok() {
+                            let _ = app.emit("progress", json!({"stage": "Sleep", "done": d.min(total.saturating_sub(1)), "total": total}));
+                        }
+                    };
+                    match fetch_seg(&cl, &url, &f, start, end, &mut got, &on_bytes).await {
+                        Ok(()) => break,
+                        Err(x) => {
+                            done.fetch_sub(got, Ordering::SeqCst); // vai repetir este pedaço do início: não contar duas vezes
+                            tries += 1;
+                            if tries >= 6 || stop.load(Ordering::SeqCst) {
+                                stop.store(true, Ordering::SeqCst);
+                                return Err(x);
+                            }
+                            tokio::time::sleep(Duration::from_millis(400 * tries)).await;
+                        }
+                    }
+                }
+            }
+        }));
+    }
+    let mut err: Option<String> = None;
+    for t in tasks {
+        match t.await {
+            Ok(Ok(())) => {}
+            Ok(Err(x)) => err = Some(x),
+            Err(x) => err = Some(x.to_string()),
+        }
+    }
+    if let Some(x) = err {
+        let _ = std::fs::remove_file(part);
+        return Err(x);
+    }
+    Ok(())
+}
+
 async fn download(app: &AppHandle, url: &str, target: &Path, sha: &str) -> Result<(), String> {
     // o nome leva o início do SHA1: um download a meio de uma versão antiga nunca se mistura com o da nova
     let tag: String = sha.chars().take(10).collect();
@@ -119,13 +297,38 @@ async fn download(app: &AppHandle, url: &str, target: &Path, sha: &str) -> Resul
             }
         }
     }
-    let cl = reqwest::Client::builder().connect_timeout(Duration::from_secs(20)).user_agent("SleepLauncher/1.0").build().map_err(e)?;
+    let cl = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(20))
+        .user_agent("SleepLauncher/1.0")
+        .tcp_nodelay(true)
+        .pool_max_idle_per_host(PARALLEL)
+        .build()
+        .map_err(e)?;
+    let verify = |p: std::path::PathBuf, sha: String| async move { tokio::task::spawn_blocking(move || hex_file(&p).is_some_and(|x| x.eq_ignore_ascii_case(&sha))).await.unwrap_or(false) };
     let mut last = String::new();
+    // 1) várias ligações ao mesmo tempo (rápido em qualquer sistema); 2) se o servidor não deixar, uma ligação que continua de onde ficou
+    match fetch_parallel(app, &cl, url, &part).await {
+        Ok(()) => {
+            if verify(part.clone(), sha.to_string()).await {
+                std::fs::rename(&part, target).map_err(e)?;
+                remember(target, sha);
+                return Ok(());
+            }
+            let _ = std::fs::remove_file(&part);
+            last = "SHA1".to_string();
+        }
+        Err(x) => {
+            let _ = std::fs::remove_file(&part);
+            last = x;
+        }
+    }
     for _ in 0..8 {
         match fetch_part(app, &cl, url, &part).await {
             Ok(()) => {
-                if hex_file(&part).is_some_and(|x| x.eq_ignore_ascii_case(sha)) {
-                    return std::fs::rename(&part, target).map_err(e);
+                if verify(part.clone(), sha.to_string()).await {
+                    std::fs::rename(&part, target).map_err(e)?;
+                    remember(target, sha);
+                    return Ok(());
                 }
                 let _ = std::fs::remove_file(&part);
                 last = "SHA1".to_string();
