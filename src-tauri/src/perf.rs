@@ -50,6 +50,32 @@ pub fn auto_ram(total: u64) -> u64 {
     }
 }
 
+/// Windows, portáteis com placa dedicada: o Windows manda programas "novos" para a gráfica integrada, muito mais lenta (100 FPS em vez de 300).
+/// Pede a gráfica de ALTO DESEMPENHO para este Java (java.exe e javaw.exe), nas definições gráficas do utilizador (HKCU, não precisa de administrador).
+/// Se a pessoa já escolheu outra coisa para este Java nas definições do Windows, não se mexe.
+#[cfg(windows)]
+pub fn prefer_fast_gpu(java: &str) {
+    use std::os::windows::process::CommandExt;
+    const KEY: &str = r"HKCU\Software\Microsoft\DirectX\UserGpuPreferences";
+    let p = Path::new(java);
+    let mut exes: Vec<std::path::PathBuf> = vec![p.to_path_buf()];
+    if let Some(dir) = p.parent() {
+        for n in ["java.exe", "javaw.exe"] {
+            let q = dir.join(n);
+            if q.exists() && !exes.contains(&q) {
+                exes.push(q);
+            }
+        }
+    }
+    for e in exes {
+        let name = e.to_string_lossy().to_string();
+        let has = std::process::Command::new("reg").args(["query", KEY, "/v", &name]).creation_flags(0x08000000).output().map(|o| o.status.success()).unwrap_or(false);
+        if !has {
+            let _ = std::process::Command::new("reg").args(["add", KEY, "/v", &name, "/t", "REG_SZ", "/d", "GpuPreference=2;", "/f"]).creation_flags(0x08000000).output();
+        }
+    }
+}
+
 const OPTIONS: &[(&str, &str)] = &[
     ("enableVsync", "false"),
     ("maxFps", "260"),

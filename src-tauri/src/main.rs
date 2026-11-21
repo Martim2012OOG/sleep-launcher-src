@@ -823,6 +823,9 @@ async fn play_instance(app: AppHandle, name: String, server: Option<String>) -> 
         use std::os::windows::process::CommandExt;
         c.creation_flags(0x08000000);
     }
+    // Windows: gráfica de alto desempenho para o Java (só se a pessoa ainda não escolheu outra)
+    #[cfg(windows)]
+    perf::prefer_fast_gpu(&java);
     console::start(&app, &clean(&name), c)?;
     let _ = patch(&app, "last", inst["name"].clone());
     if prefs["hide_on_play"].as_bool().unwrap_or(true) && inst["open_console"].as_bool() != Some(true) {
